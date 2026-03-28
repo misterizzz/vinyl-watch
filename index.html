@@ -37,7 +37,7 @@
     main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .view { display: none; padding: 16px 16px 8px; }
     .view.active { display: block; }
-    nav { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; padding-bottom: var(--safe-bottom); }
+    nav { display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; padding-bottom: var(--safe-bottom); }
     .nav-btn { background: none; border: none; color: var(--muted); padding: 10px 6px; cursor: pointer; font-family: var(--font-mono); font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: color 0.2s; position: relative; }
     .nav-btn.active { color: var(--gold); }
     .nav-btn .nav-icon { font-size: 18px; line-height: 1; }
@@ -243,12 +243,39 @@
           <button class="btn secondary" id="clear-data-btn" style="margin-top:4px;">Alles wissen</button>
         </div>
       </div>
+
+      <!-- LABELS -->
+      <div class="view" id="view-labels">
+        <div class="action-card" id="search-label-btn" style="margin-bottom:13px;">
+          <div class="ac-icon">🔍</div>
+          <div class="ac-title">Label / serie zoeken</div>
+          <div class="ac-desc">Bijv. "Blue Note Tone Poet", "ECM", "Verve"</div>
+        </div>
+        <div class="section-header">
+          <div class="section-title">Gevolgde labels</div>
+          <span id="label-count" style="font-size:11px;color:var(--muted);"></span>
+        </div>
+        <div id="label-list"></div>
+        <div id="labels-empty" class="empty" style="display:none;">
+          <div class="ei">🏷</div><h3>Nog geen labels</h3>
+          <p>Zoek een label of serie om te volgen.</p>
+        </div>
+        <div style="margin-top:16px;">
+          <div class="section-title" style="margin-bottom:11px;">Recente label releases</div>
+          <div id="label-releases-list"></div>
+          <div id="label-releases-empty" class="empty" style="display:none;">
+            <div class="ei">💿</div><h3>Nog geen releases</h3>
+            <p>Druk op "Vernieuwen" na het toevoegen van een label.</p>
+          </div>
+        </div>
+      </div>
     </main>
 
     <nav>
       <button class="nav-btn active" data-tab="artists"><span class="nav-icon">♪</span>Artiesten</button>
       <button class="nav-btn" data-tab="releases"><span class="nav-icon">💿</span>Releases<span class="badge" id="badge-r" style="display:none;"></span></button>
       <button class="nav-btn" data-tab="deals"><span class="nav-icon">🏷</span>Deals<span class="badge" id="badge-d" style="display:none;"></span></button>
+      <button class="nav-btn" data-tab="labels"><span class="nav-icon">🎙</span>Labels<span class="badge" id="badge-l" style="display:none;"></span></button>
       <button class="nav-btn" data-tab="settings"><span class="nav-icon">⚙️</span>Instellingen</button>
     </nav>
   </div>
@@ -285,6 +312,20 @@
   </div>
 </div>
 
+
+<!-- LABEL SEARCH OVERLAY -->
+<div class="overlay" id="label-overlay">
+  <div class="sheet">
+    <div class="sheet-title">Label / serie zoeken</div>
+    <div class="search-row">
+      <input type="text" id="label-search-input" placeholder="Bijv. Tone Poet, ECM…" autocomplete="off">
+      <button class="search-submit" id="label-search-submit">Zoek</button>
+    </div>
+    <div class="search-results" id="label-search-results"></div>
+    <button class="btn secondary" id="close-label-search">Sluiten</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -298,6 +339,8 @@ const S = {
   artists:    JSON.parse(localStorage.getItem('vw_artists') || '[]'),
   releases:   JSON.parse(localStorage.getItem('vw_releases') || '[]'),
   deals:      JSON.parse(localStorage.getItem('vw_deals') || '[]'),
+  labels:     JSON.parse(localStorage.getItem('vw_labels') || '[]'),
+  labelReleases: JSON.parse(localStorage.getItem('vw_label_releases') || '[]'),
   lastSync:   localStorage.getItem('vw_last_sync') || null,
   syncing:    false,
 };
@@ -306,6 +349,8 @@ const save = () => {
   localStorage.setItem('vw_artists',  JSON.stringify(S.artists));
   localStorage.setItem('vw_releases', JSON.stringify(S.releases));
   localStorage.setItem('vw_deals',    JSON.stringify(S.deals));
+  localStorage.setItem('vw_labels', JSON.stringify(S.labels));
+  localStorage.setItem('vw_label_releases', JSON.stringify(S.labelReleases));
   if (S.lastSync) localStorage.setItem('vw_last_sync', S.lastSync);
 };
 
@@ -574,6 +619,7 @@ async function startSync() {
     } catch(err){ console.warn(`Fout ${artist.name}:`, err.message); }
   }
 
+  await syncLabels();
   S.releases.sort((a,b)=>(b.year||0)-(a.year||0));
   S.deals.sort((a,b)=>(b.discount_pct||0)-(a.discount_pct||0));
   S.lastSync = new Date().toISOString();
@@ -597,8 +643,9 @@ document.getElementById('save-token-btn').addEventListener('click', () => {
 document.getElementById('clear-data-btn').addEventListener('click', () => {
   if (!confirm('Weet je zeker dat je alle artiesten, releases en deals wil wissen?')) return;
   S.artists=[]; S.releases=[]; S.deals=[]; S.lastSync=null;
-  ['vw_artists','vw_releases','vw_deals','vw_last_sync'].forEach(k=>localStorage.removeItem(k));
-  renderArtists(); renderReleases(); renderDeals(); toast('Data gewist');
+  ['vw_artists','vw_releases','vw_deals','vw_labels','vw_label_releases','vw_last_sync'].forEach(k=>localStorage.removeItem(k));
+  S.labels=[]; S.labelReleases=[];
+  renderArtists(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases(); toast('Data gewist');
 });
 
 // ── RENDER ────────────────────────────────────
@@ -655,12 +702,134 @@ function renderDeals() {
     </a>`).join('');
 }
 
+
+// ── LABELS ────────────────────────────────────
+document.getElementById('search-label-btn').addEventListener('click', () => {
+  document.getElementById('label-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('label-search-input').focus(), 300);
+});
+document.getElementById('close-label-search').addEventListener('click', closeLabelSearch);
+document.getElementById('label-overlay').addEventListener('click', e => { if (e.target.id === 'label-overlay') closeLabelSearch(); });
+document.getElementById('label-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doLabelSearch(); });
+document.getElementById('label-search-submit').addEventListener('click', doLabelSearch);
+
+function closeLabelSearch() {
+  document.getElementById('label-overlay').classList.remove('open');
+  document.getElementById('label-search-results').innerHTML = '';
+  document.getElementById('label-search-input').value = '';
+}
+
+async function doLabelSearch() {
+  const q = document.getElementById('label-search-input').value.trim();
+  if (!q) return;
+  const el = document.getElementById('label-search-results');
+  el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">Zoeken…</div>';
+  try {
+    const d = await discogsGet(`/database/search?q=${encodeURIComponent(q)}&type=label&per_page=10`);
+    const results = d.results || [];
+    if (!results.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">Geen resultaten.</div>'; return; }
+    el.innerHTML = results.map(r => {
+      const added = S.labels.some(l => l.id === r.id);
+      return `<div class="search-result" data-id="${r.id}" data-name="${esc(r.title)}">
+        <div><div class="sr-name">${esc(r.title)}</div><div class="sr-meta">ID ${r.id}</div></div>
+        <button class="add-btn" ${added?'disabled style="opacity:.4"':''}>${added?'✓':'+ Volgen'}</button>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.add-btn:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.search-result');
+        addLabel({ id: parseInt(row.dataset.id), name: row.dataset.name });
+        btn.textContent = '✓'; btn.disabled = true; btn.style.opacity = '.4';
+      });
+    });
+  } catch (err) {
+    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${err.message}</div>`;
+  }
+}
+
+function addLabel(label) {
+  if (S.labels.some(l => l.id === label.id)) return;
+  S.labels.push({ ...label, addedAt: new Date().toISOString() });
+  save(); renderLabels(); toast(`${label.name} toegevoegd`);
+}
+
+function removeLabel(id) {
+  S.labels = S.labels.filter(l => l.id !== id);
+  S.labelReleases = S.labelReleases.filter(r => r.labelId !== id);
+  save(); renderLabels(); renderLabelReleases();
+}
+
+async function syncLabels() {
+  if (!S.labels.length) return;
+  const yr = new Date().getFullYear();
+  for (const label of S.labels) {
+    try {
+      const data = await discogsGet(`/labels/${label.id}/releases?sort=year&sort_order=desc&per_page=50`);
+      await delay(DELAY);
+      const recent = (data.releases || []).filter(r => {
+        const y = parseInt(r.year);
+        return y === yr || y === yr - 1;
+      });
+      for (const rel of recent.slice(0, 10)) {
+        if (S.labelReleases.some(r => r.id === rel.id)) continue;
+        S.labelReleases.push({
+          id: rel.id,
+          labelId: label.id,
+          labelName: label.name,
+          title: rel.title,
+          year: rel.year,
+          thumb: rel.thumb || '',
+          uri: `https://www.discogs.com/release/${rel.id}`,
+          catno: rel.catno || '',
+        });
+      }
+    } catch (err) { console.warn(`Label fout ${label.name}:`, err.message); }
+  }
+  S.labelReleases.sort((a,b) => (b.year||0) - (a.year||0));
+  save();
+  renderLabelReleases();
+}
+
+function renderLabels() {
+  const list = document.getElementById('label-list');
+  const empty = document.getElementById('labels-empty');
+  const count = document.getElementById('label-count');
+  count.textContent = S.labels.length ? `${S.labels.length} label(s)` : '';
+  if (!S.labels.length) { list.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  list.innerHTML = S.labels.map(l => `
+    <div class="artist-card">
+      <div><div class="artist-name">${esc(l.name)}</div><div class="artist-meta">Discogs ID ${l.id}</div></div>
+      <button class="remove-btn" data-id="${l.id}">×</button>
+    </div>`).join('');
+  list.querySelectorAll('.remove-btn').forEach(btn => btn.addEventListener('click', () => removeLabel(parseInt(btn.dataset.id))));
+}
+
+function renderLabelReleases() {
+  const list = document.getElementById('label-releases-list');
+  const empty = document.getElementById('label-releases-empty');
+  const badge = document.getElementById('badge-l');
+  if (!S.labelReleases.length) { list.innerHTML=''; empty.style.display='block'; badge.style.display='none'; return; }
+  empty.style.display='none';
+  badge.textContent = S.labelReleases.length > 99 ? '99+' : S.labelReleases.length;
+  badge.style.display='block';
+  list.innerHTML = S.labelReleases.map(r => `
+    <a class="result-card" href="${r.uri}" target="_blank" rel="noopener">
+      ${r.thumb?`<img class="result-thumb" src="${r.thumb}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
+      <div class="result-info">
+        <div class="result-title">${esc(r.title)}</div>
+        <div class="result-artist" style="color:var(--gold)">${esc(r.labelName)}</div>
+        <div class="result-shop">${r.year||'?'}${r.catno?' · '+esc(r.catno):''}</div>
+      </div>
+    </a>`).join('');
+}
+
 // ── INIT ─────────────────────────────────────
 function showApp() {
   document.getElementById('setup-view').style.display='none';
   const m=document.getElementById('main-app'); m.style.display='flex';
   document.getElementById('settings-backend-url').value = S.backendUrl;
-  renderArtists(); renderReleases(); renderDeals();
+  renderArtists(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases();
   wakeBackend();
 }
 
