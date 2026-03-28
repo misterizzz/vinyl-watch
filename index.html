@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>VinylWatch</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f0d0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VinylWatch">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0d0a; --surface: #1c1914; --surface2: #252019; --border: #302820;
+      --red: #c5341a; --gold: #c9a227; --gold-dim: #7a6020;
+      --text: #f0e6d3; --muted: #8a7c6a; --green: #4a9e6a;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-mono: 'Courier Prime', 'Courier New', monospace;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 15px; line-height: 1.5; overflow: hidden; }
+    #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; }
+    header { padding: calc(var(--safe-top) + 16px) 20px 14px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .logo { font-family: var(--font-display); font-size: 22px; font-weight: 900; }
+    .logo span { color: var(--red); }
+    .sync-btn { background: none; border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+    .sync-btn:hover { border-color: var(--gold); color: var(--gold); }
+    .sync-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .sync-btn.spinning .spin-icon { display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .view { display: none; padding: 16px 16px 8px; }
+    .view.active { display: block; }
+    nav { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0; padding-bottom: var(--safe-bottom); }
+    .nav-btn { background: none; border: none; color: var(--muted); padding: 10px 6px; cursor: pointer; font-family: var(--font-mono); font-size: 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: color 0.2s; position: relative; }
+    .nav-btn.active { color: var(--gold); }
+    .nav-btn .nav-icon { font-size: 18px; line-height: 1; }
+    .badge { position: absolute; top: 6px; right: calc(50% - 20px); background: var(--red); color: white; font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 20px; min-width: 16px; text-align: center; }
+
+    /* SETUP */
+    #setup-view { overflow-y: auto; height: 100dvh; padding: 32px 20px 40px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+    .setup-logo { font-family: var(--font-display); font-size: 40px; font-weight: 900; text-align: center; line-height: 1; }
+    .setup-logo em { color: var(--red); display: block; font-size: 15px; font-weight: 400; font-style: italic; margin-top: 4px; }
+    .record-art { width: 90px; height: 90px; animation: slowspin 8s linear infinite; }
+    @keyframes slowspin { to { transform: rotate(360deg); } }
+    .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px; width: 100%; display: flex; flex-direction: column; gap: 11px; }
+    .setup-card h2 { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--gold); }
+    .step-num { background: var(--red); color: white; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; display: inline-block; }
+    .setup-card ol { padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    input[type="text"], input[type="password"], input[type="url"] { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: var(--font-mono); font-size: 13px; padding: 9px 12px; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: var(--gold); }
+    .btn { width: 100%; background: var(--red); border: none; border-radius: 4px; color: white; font-family: var(--font-mono); font-size: 14px; font-weight: 700; padding: 11px; cursor: pointer; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn.sm { padding: 7px 14px; font-size: 12px; width: auto; }
+    .error-msg { color: var(--red); font-size: 12px; }
+    .success-msg { color: var(--green); font-size: 12px; }
+
+    /* COMMON */
+    .section-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+    .meta-label { font-size: 11px; color: var(--muted); margin-bottom: 13px; }
+    .action-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 13px; cursor: pointer; transition: border-color 0.2s; display: flex; flex-direction: column; gap: 4px; }
+    .action-card:hover { border-color: var(--gold); }
+    .action-card .ac-icon { font-size: 20px; }
+    .action-card .ac-title { font-size: 13px; font-weight: 700; }
+    .action-card .ac-desc { font-size: 11px; color: var(--muted); }
+    .actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 13px; }
+    .status-card { background: var(--surface); border: 1px solid var(--gold-dim); border-radius: 6px; padding: 11px 13px; margin-bottom: 11px; font-size: 12px; color: var(--muted); }
+    .status-card strong { color: var(--gold); }
+    .artist-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .artist-name { font-weight: 700; font-size: 13px; }
+    .artist-meta { font-size: 11px; color: var(--muted); }
+    .remove-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 4px; transition: color 0.2s; }
+    .remove-btn:hover { color: var(--red); }
+    .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 11px; margin-bottom: 7px; display: flex; gap: 10px; cursor: pointer; transition: border-color 0.2s; text-decoration: none; color: inherit; }
+    .result-card:hover { border-color: var(--gold-dim); }
+    .result-card.deal { border-color: var(--green); }
+    .result-thumb { width: 50px; height: 50px; border-radius: 4px; background: var(--surface2); flex-shrink: 0; object-fit: cover; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    .result-info { flex: 1; min-width: 0; }
+    .result-title { font-weight: 700; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .result-artist { font-size: 12px; color: var(--gold); margin: 2px 0; }
+    .result-shop { font-size: 11px; color: var(--muted); }
+    .deal-badge { background: var(--green); color: white; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block; margin-top: 3px; }
+    .price-col { text-align: right; flex-shrink: 0; }
+    .price-now { font-size: 14px; font-weight: 700; color: var(--green); }
+    .price-was { font-size: 11px; color: var(--muted); text-decoration: line-through; }
+    .price-pct { font-size: 11px; color: var(--green); }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .sheet { background: var(--surface); border-radius: 16px 16px 0 0; border: 1px solid var(--border); border-bottom: none; width: 100%; max-width: 480px; margin: 0 auto; padding: 20px 16px calc(var(--safe-bottom) + 20px); transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1); max-height: 85vh; display: flex; flex-direction: column; gap: 11px; }
+    .overlay.open .sheet { transform: none; }
+    .sheet-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+    .search-row { display: flex; gap: 8px; }
+    .search-row input { flex: 1; }
+    .search-submit { background: var(--red); border: none; border-radius: 4px; color: white; padding: 9px 13px; font-family: var(--font-mono); font-size: 13px; cursor: pointer; }
+    .search-results { overflow-y: auto; flex: 1; }
+    .search-result { padding: 9px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; transition: background 0.15s; }
+    .search-result:hover { background: var(--surface2); }
+    .sr-name { font-size: 13px; font-weight: 700; }
+    .sr-meta { font-size: 11px; color: var(--muted); }
+    .add-btn { background: var(--green); border: none; border-radius: 3px; color: white; font-family: var(--font-mono); font-size: 11px; padding: 4px 10px; cursor: pointer; }
+    .empty { text-align: center; padding: 38px 22px; color: var(--muted); }
+    .empty .ei { font-size: 40px; margin-bottom: 10px; }
+    .empty h3 { font-family: var(--font-display); color: var(--text); margin-bottom: 6px; font-size: 16px; }
+    .empty p { font-size: 13px; line-height: 1.6; }
+    .sync-info { text-align: center; font-size: 11px; color: var(--muted); padding: 7px; }
+    .wake-banner { background: var(--surface2); border: 1px solid var(--gold-dim); border-radius: 6px; padding: 9px 13px; margin-bottom: 11px; font-size: 12px; color: var(--muted); display: none; }
+    .wake-banner.show { display: block; }
+    .toast { position: fixed; bottom: calc(var(--safe-bottom) + 76px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 13px; padding: 9px 18px; border-radius: 20px; opacity: 0; transition: all 0.3s; white-space: nowrap; z-index: 200; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .upload-zone { border: 2px dashed var(--border); border-radius: 6px; padding: 20px; text-align: center; cursor: pointer; transition: border-color 0.2s; font-size: 13px; color: var(--muted); }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--gold); color: var(--gold); }
+    .upload-zone input { display: none; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP -->
+  <div id="setup-view">
+    <div class="setup-logo">Vinyl<em>Watch</em></div>
+    <svg class="record-art" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="60" r="58" fill="#1c1914" stroke="#c9a227" stroke-width="1.5"/>
+      <circle cx="60" cy="60" r="44" fill="#0f0d0a" stroke="#302820" stroke-width="0.5"/>
+      <circle cx="60" cy="60" r="30" fill="#1c1914" stroke="#302820" stroke-width="0.5"/>
+      <circle cx="60" cy="60" r="18" fill="#0f0d0a" stroke="#c5341a" stroke-width="1"/>
+      <circle cx="60" cy="60" r="5" fill="#c9a227"/>
+      <circle cx="60" cy="60" r="2" fill="#0f0d0a"/>
+    </svg>
+
+    <div class="setup-card">
+      <span class="step-num">STAP 1</span>
+      <h2>Backend URL instellen</h2>
+      <p style="font-size:13px;color:var(--muted);">Heb je de backend nog niet gedeployd? Zie de README in de <code>vinyl-backend</code> map.</p>
+      <div><label>RENDER.COM URL</label>
+        <input type="url" id="backend-url-input" placeholder="https://vinyl-backend-xxxx.onrender.com" autocomplete="off">
+      </div>
+      <button class="btn" id="test-backend-btn">Verbinding testen →</button>
+      <div id="backend-status"></div>
+    </div>
+
+    <div class="setup-card">
+      <span class="step-num">STAP 2</span>
+      <h2>Discogs token</h2>
+      <ol>
+        <li>Ga naar <strong>discogs.com</strong> → inloggen</li>
+        <li>Avatar → <strong>Settings → Developers</strong></li>
+        <li>Klik <strong>Generate new token</strong> en kopieer</li>
+      </ol>
+      <div><label>PERSONAL ACCESS TOKEN (niet hier delen!)</label>
+        <input type="password" id="token-input" placeholder="Plak hier je token…" autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+
+    <button class="btn" id="connect-btn">Doorgaan →</button>
+    <div id="setup-error" class="error-msg" style="display:none;"></div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="main-app" style="display:none; flex-direction:column; height:100%;">
+    <header>
+      <div class="logo">Vinyl<span>Watch</span></div>
+      <button class="sync-btn" id="sync-btn">
+        <span class="spin-icon">↻</span>
+        <span id="sync-label">Vernieuwen</span>
+      </button>
+    </header>
+
+    <main>
+      <div class="view active" id="view-artists">
+        <div class="actions-row">
+          <div class="action-card" id="xml-import-btn">
+            <div class="ac-icon">🎵</div>
+            <div class="ac-title">Apple Music XML</div>
+            <div class="ac-desc">Importeer je muziekbibliotheek</div>
+          </div>
+          <div class="action-card" id="search-artist-btn">
+            <div class="ac-icon">🔍</div>
+            <div class="ac-title">Artiest zoeken</div>
+            <div class="ac-desc">Handmatig toevoegen</div>
+          </div>
+        </div>
+        <div id="import-status" style="display:none;" class="status-card"></div>
+        <div class="section-header">
+          <div class="section-title">Gevolgde artiesten</div>
+          <span id="artist-count" style="font-size:11px;color:var(--muted);"></span>
+        </div>
+        <div id="artist-list"></div>
+        <div id="artists-empty" class="empty" style="display:none;">
+          <div class="ei">🎵</div><h3>Nog geen artiesten</h3>
+          <p>Importeer je Apple Music bibliotheek of zoek een artiest.</p>
+        </div>
+      </div>
+
+      <div class="view" id="view-releases">
+        <div class="section-title" style="margin-bottom:13px;">Nieuwe releases</div>
+        <div id="wake-r" class="wake-banner">⏳ Backend opstart… eerste keer kan 30–60 sec duren.</div>
+        <div id="releases-list"></div>
+        <div id="releases-empty" class="empty" style="display:none;">
+          <div class="ei">🎛️</div><h3>Nog niets gevonden</h3>
+          <p>Voeg artiesten toe en druk op "Vernieuwen".</p>
+        </div>
+        <div id="sync-info-r" class="sync-info"></div>
+      </div>
+
+      <div class="view" id="view-deals">
+        <div class="section-title">Aanbiedingen</div>
+        <div class="meta-label">≥30% onder mediaanprijs · Discogs · HHV · Juno · Rough Trade · eBay</div>
+        <div id="wake-d" class="wake-banner">⏳ Backend opstart… eerste keer kan 30–60 sec duren.</div>
+        <div id="deals-list"></div>
+        <div id="deals-empty" class="empty" style="display:none;">
+          <div class="ei">💰</div><h3>Geen deals gevonden</h3>
+          <p>Op dit moment geen platen voor 30%+ korting.</p>
+        </div>
+        <div id="sync-info-d" class="sync-info"></div>
+      </div>
+
+      <div class="view" id="view-settings">
+        <div class="section-title" style="margin-bottom:14px;">Instellingen</div>
+        <div class="setup-card" style="margin-bottom:10px;">
+          <h2>Backend URL</h2>
+          <input type="url" id="settings-backend-url" placeholder="https://vinyl-backend-xxxx.onrender.com">
+          <button class="btn sm" id="save-backend-btn" style="margin-top:4px;">Opslaan</button>
+        </div>
+        <div class="setup-card" style="margin-bottom:10px;">
+          <h2>Discogs token</h2>
+          <input type="password" id="settings-token" placeholder="••••••••••••">
+          <button class="btn sm" id="save-token-btn" style="margin-top:4px;">Opslaan</button>
+        </div>
+        <div class="setup-card">
+          <h2>Data wissen</h2>
+          <p style="font-size:13px;color:var(--muted);">Verwijdert artiesten, releases en deals. Instellingen blijven.</p>
+          <button class="btn secondary" id="clear-data-btn" style="margin-top:4px;">Alles wissen</button>
+        </div>
+      </div>
+    </main>
+
+    <nav>
+      <button class="nav-btn active" data-tab="artists"><span class="nav-icon">♪</span>Artiesten</button>
+      <button class="nav-btn" data-tab="releases"><span class="nav-icon">💿</span>Releases<span class="badge" id="badge-r" style="display:none;"></span></button>
+      <button class="nav-btn" data-tab="deals"><span class="nav-icon">🏷</span>Deals<span class="badge" id="badge-d" style="display:none;"></span></button>
+      <button class="nav-btn" data-tab="settings"><span class="nav-icon">⚙️</span>Instellingen</button>
+    </nav>
+  </div>
+</div>
+
+<!-- SEARCH OVERLAY -->
+<div class="overlay" id="search-overlay">
+  <div class="sheet">
+    <div class="sheet-title">Artiest zoeken</div>
+    <div class="search-row">
+      <input type="text" id="artist-search-input" placeholder="Bijv. Miles Davis…" autocomplete="off">
+      <button class="search-submit" id="artist-search-submit">Zoek</button>
+    </div>
+    <div class="search-results" id="search-results"></div>
+    <button class="btn secondary" id="close-search">Sluiten</button>
+  </div>
+</div>
+
+<!-- XML OVERLAY -->
+<div class="overlay" id="xml-overlay">
+  <div class="sheet">
+    <div class="sheet-title">Apple Music importeren</div>
+    <p style="font-size:13px;color:var(--muted);">
+      Open de <strong>Muziek-app</strong> op je Mac →<br>
+      Bovenste menu → <strong>Archief → Bibliotheek → Exporteer bibliotheek…</strong><br>
+      Sla het .xml-bestand op en upload het hieronder.
+    </p>
+    <label class="upload-zone" id="upload-zone">
+      <input type="file" id="xml-file-input" accept=".xml">
+      📂 Tik of sleep een bestand hiernaartoe
+    </label>
+    <div id="xml-status" style="font-size:12px;color:var(--muted);min-height:18px;"></div>
+    <button class="btn secondary" id="close-xml">Sluiten</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DISCOGS = 'https://api.discogs.com';
+const DELAY = 700;
+
+const S = {
+  token:      localStorage.getItem('vw_token') || '',
+  username:   localStorage.getItem('vw_username') || '',
+  backendUrl: localStorage.getItem('vw_backend') || '',
+  artists:    JSON.parse(localStorage.getItem('vw_artists') || '[]'),
+  releases:   JSON.parse(localStorage.getItem('vw_releases') || '[]'),
+  deals:      JSON.parse(localStorage.getItem('vw_deals') || '[]'),
+  lastSync:   localStorage.getItem('vw_last_sync') || null,
+  syncing:    false,
+};
+
+const save = () => {
+  localStorage.setItem('vw_artists',  JSON.stringify(S.artists));
+  localStorage.setItem('vw_releases', JSON.stringify(S.releases));
+  localStorage.setItem('vw_deals',    JSON.stringify(S.deals));
+  if (S.lastSync) localStorage.setItem('vw_last_sync', S.lastSync);
+};
+
+const delay = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function toast(msg, ms = 2500) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function sinceText(iso) {
+  if (!iso) return '';
+  const min = Math.floor((Date.now() - new Date(iso)) / 60000);
+  if (min < 2) return 'Zojuist bijgewerkt';
+  if (min < 60) return `${min} min geleden bijgewerkt`;
+  const hr = Math.floor(min / 60);
+  return hr < 24 ? `${hr} uur geleden bijgewerkt` : `${Math.floor(hr/24)} dag(en) geleden bijgewerkt`;
+}
+
+async function discogsGet(path) {
+  const r = await fetch(`${DISCOGS}${path}`, {
+    headers: { 'Authorization': `Discogs token=${S.token}`, 'User-Agent': 'VinylWatch/2.0' }
+  });
+  if (!r.ok) throw new Error(`Discogs ${r.status}`);
+  return r.json();
+}
+
+async function backendSearch(artist, title = '', median = 0) {
+  if (!S.backendUrl) return [];
+  const r = await fetch(`${S.backendUrl}/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ artist, title, median_price_eur: median }),
+  });
+  if (!r.ok) throw new Error(`Backend ${r.status}`);
+  const d = await r.json();
+  return d.results || [];
+}
+
+async function wakeBackend() {
+  if (!S.backendUrl) return;
+  try { await fetch(`${S.backendUrl}/ping`); } catch (_) {}
+}
+
+// ── SETUP ──────────────────────────────────────
+document.getElementById('test-backend-btn').addEventListener('click', async () => {
+  const url = document.getElementById('backend-url-input').value.trim().replace(/\/$/, '');
+  const el = document.getElementById('backend-status');
+  if (!url) { el.innerHTML = '<span class="error-msg">Vul een URL in.</span>'; return; }
+  el.innerHTML = '<span style="color:var(--muted);font-size:12px;">Verbinden…</span>';
+  try {
+    const r = await fetch(`${url}/ping`);
+    const d = await r.json();
+    el.innerHTML = `<span class="success-msg">✅ Verbonden! Scrapers actief: ${(d.scrapers||[]).join(', ')}</span>`;
+    S.backendUrl = url;
+    localStorage.setItem('vw_backend', url);
+  } catch {
+    el.innerHTML = '<span class="error-msg">❌ Geen verbinding. Backend al gedeployd op Render.com?</span>';
+  }
+});
+
+document.getElementById('connect-btn').addEventListener('click', async () => {
+  const token = document.getElementById('token-input').value.trim();
+  const errEl = document.getElementById('setup-error');
+  const btn = document.getElementById('connect-btn');
+  if (!token) { errEl.textContent = 'Vul een Discogs token in.'; errEl.style.display='block'; return; }
+  if (!S.backendUrl) { errEl.textContent = 'Test eerst de backend verbinding (stap 1).'; errEl.style.display='block'; return; }
+  btn.disabled = true; btn.textContent = 'Verbinden…'; errEl.style.display = 'none';
+  try {
+    S.token = token;
+    const id = await discogsGet('/oauth/identity');
+    S.username = id.username;
+    localStorage.setItem('vw_token', S.token);
+    localStorage.setItem('vw_username', S.username);
+    showApp();
+  } catch {
+    errEl.textContent = 'Discogs token ongeldig of geen verbinding.';
+    errEl.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Doorgaan →';
+  }
+});
+
+// ── NAV ──────────────────────────────────────
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(`view-${btn.dataset.tab}`).classList.add('active');
+  });
+});
+
+// ── XML IMPORT ────────────────────────────────
+document.getElementById('xml-import-btn').addEventListener('click', () => document.getElementById('xml-overlay').classList.add('open'));
+document.getElementById('close-xml').addEventListener('click', () => document.getElementById('xml-overlay').classList.remove('open'));
+
+document.getElementById('xml-file-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('xml-status');
+  statusEl.textContent = '⏳ Bestand inlezen…';
+
+  try {
+    const text = await file.text();
+    const xml = new DOMParser().parseFromString(text, 'text/xml');
+
+    // Apple Music XML: find all <key>Artist</key> → next <string>
+    const artistSet = new Set();
+    xml.querySelectorAll('key').forEach(key => {
+      if (key.textContent === 'Artist') {
+        const next = key.nextElementSibling;
+        if (next && next.tagName === 'string' && next.textContent.trim()) {
+          artistSet.add(next.textContent.trim());
+        }
+      }
+    });
+
+    if (!artistSet.size) {
+      statusEl.innerHTML = '<span class="error-msg">Geen artiesten gevonden. Is dit een Apple Music bibliotheek XML?</span>';
+      return;
+    }
+
+    statusEl.textContent = `📦 ${artistSet.size} artiesten gevonden. Discogs ID's ophalen…`;
+    let added = 0, i = 0;
+
+    for (const name of artistSet) {
+      i++;
+      if (S.artists.some(a => a.name.toLowerCase() === name.toLowerCase())) continue;
+      try {
+        statusEl.textContent = `🔍 ${i}/${artistSet.size}: ${name}`;
+        const d = await discogsGet(`/database/search?q=${encodeURIComponent(name)}&type=artist&per_page=1`);
+        const r = d.results?.[0];
+        if (r) { S.artists.push({ id: r.id, name, addedAt: new Date().toISOString() }); added++; }
+        await delay(DELAY);
+      } catch (_) {}
+    }
+
+    save();
+    renderArtists();
+    statusEl.innerHTML = `<span class="success-msg">✅ ${added} artiesten geïmporteerd!</span>`;
+    setTimeout(() => document.getElementById('xml-overlay').classList.remove('open'), 2000);
+  } catch (err) {
+    statusEl.innerHTML = `<span class="error-msg">Fout: ${err.message}</span>`;
+  }
+});
+
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) { const dt = new DataTransfer(); dt.items.add(f); const inp = document.getElementById('xml-file-input'); inp.files = dt.files; inp.dispatchEvent(new Event('change')); }
+});
+
+// ── ARTIST SEARCH ──────────────────────────────
+document.getElementById('search-artist-btn').addEventListener('click', () => {
+  document.getElementById('search-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('artist-search-input').focus(), 300);
+});
+document.getElementById('close-search').addEventListener('click', closeSearch);
+document.getElementById('search-overlay').addEventListener('click', e => { if (e.target.id === 'search-overlay') closeSearch(); });
+document.getElementById('artist-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+document.getElementById('artist-search-submit').addEventListener('click', doSearch);
+
+function closeSearch() {
+  document.getElementById('search-overlay').classList.remove('open');
+  document.getElementById('search-results').innerHTML = '';
+  document.getElementById('artist-search-input').value = '';
+}
+
+async function doSearch() {
+  const q = document.getElementById('artist-search-input').value.trim();
+  if (!q) return;
+  const el = document.getElementById('search-results');
+  el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">Zoeken…</div>';
+  try {
+    const d = await discogsGet(`/database/search?q=${encodeURIComponent(q)}&type=artist&per_page=10`);
+    const results = d.results || [];
+    if (!results.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">Geen resultaten.</div>'; return; }
+    el.innerHTML = results.map(r => {
+      const added = S.artists.some(a => a.id === r.id);
+      return `<div class="search-result" data-id="${r.id}" data-name="${esc(r.title)}">
+        <div><div class="sr-name">${esc(r.title)}</div><div class="sr-meta">ID ${r.id}</div></div>
+        <button class="add-btn" ${added?'disabled style="opacity:.4"':''}>${added?'✓':'+ Volgen'}</button>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.add-btn:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.search-result');
+        addArtist({ id: parseInt(row.dataset.id), name: row.dataset.name });
+        btn.textContent = '✓'; btn.disabled = true; btn.style.opacity = '.4';
+      });
+    });
+  } catch (err) {
+    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${err.message}</div>`;
+  }
+}
+
+function addArtist(artist) {
+  if (S.artists.some(a => a.id === artist.id)) return;
+  S.artists.push({ ...artist, addedAt: new Date().toISOString() });
+  save(); renderArtists(); toast(`${artist.name} toegevoegd`);
+}
+
+function removeArtist(id) {
+  S.artists = S.artists.filter(a => a.id !== id);
+  S.releases = S.releases.filter(r => r.artistId !== id);
+  S.deals = S.deals.filter(d => d.artistId !== id);
+  save(); renderArtists(); renderReleases(); renderDeals();
+}
+
+// ── SYNC ──────────────────────────────────────
+document.getElementById('sync-btn').addEventListener('click', startSync);
+
+async function startSync() {
+  if (S.syncing) return;
+  if (!S.artists.length) { toast('Voeg eerst artiesten toe'); return; }
+  S.syncing = true; S.releases = []; S.deals = [];
+  const btn = document.getElementById('sync-btn');
+  const label = document.getElementById('sync-label');
+  btn.disabled = true; btn.classList.add('spinning');
+  document.getElementById('wake-r').classList.add('show');
+  document.getElementById('wake-d').classList.add('show');
+  wakeBackend();
+
+  const yr = new Date().getFullYear();
+
+  for (let i = 0; i < S.artists.length; i++) {
+    const artist = S.artists[i];
+    label.textContent = `${i+1}/${S.artists.length}`;
+    try {
+      const data = await discogsGet(`/artists/${artist.id}/releases?sort=year&sort_order=desc&per_page=50`);
+      await delay(DELAY);
+      const recent = (data.releases||[]).filter(r => { const y=parseInt(r.year); return (y===yr||y===yr-1)&&r.type==='release'; });
+      let medianPrice = 0;
+
+      for (const rel of recent.slice(0,5)) {
+        await delay(DELAY);
+        try {
+          const det = await discogsGet(`/releases/${rel.id}`);
+          const isVinyl = (det.formats||[]).some(f => f.name==='Vinyl'||(f.descriptions||[]).some(d=>['LP','7"','12"','10"'].includes(d)));
+          if (!isVinyl) continue;
+          let median = 0;
+          try { await delay(DELAY); const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`); median = st.median_price?.value||0; medianPrice=median; } catch(_){}
+          const obj = { id:rel.id, artistId:artist.id, artistName:artist.name, title:det.title, year:det.year, thumb:det.thumb||det.images?.[0]?.resource_url||'', uri:`https://www.discogs.com/release/${rel.id}`, lowestPrice:det.lowest_price||0, medianPrice:median, numForSale:det.num_for_sale||0 };
+          S.releases.push(obj);
+          if (median && det.lowest_price && det.lowest_price <= median*0.70) {
+            S.deals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace' });
+          }
+        } catch(_){}
+      }
+
+      // Backend shops
+      if (S.backendUrl) {
+        try {
+          const shopResults = await backendSearch(artist.name, '', medianPrice);
+          shopResults.filter(r=>r.is_deal).forEach(d => {
+            S.deals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note });
+          });
+        } catch(e){ console.warn(`Backend fout ${artist.name}:`, e.message); }
+      }
+    } catch(err){ console.warn(`Fout ${artist.name}:`, err.message); }
+  }
+
+  S.releases.sort((a,b)=>(b.year||0)-(a.year||0));
+  S.deals.sort((a,b)=>(b.discount_pct||0)-(a.discount_pct||0));
+  S.lastSync = new Date().toISOString();
+  save();
+  document.getElementById('wake-r').classList.remove('show');
+  document.getElementById('wake-d').classList.remove('show');
+  renderReleases(); renderDeals();
+  S.syncing = false; btn.disabled = false; btn.classList.remove('spinning'); label.textContent = 'Vernieuwen';
+  toast(`Klaar! ${S.releases.length} releases · ${S.deals.length} deal(s)`);
+}
+
+// ── SETTINGS ──────────────────────────────────
+document.getElementById('save-backend-btn').addEventListener('click', () => {
+  const u = document.getElementById('settings-backend-url').value.trim().replace(/\/$/, '');
+  if (u) { S.backendUrl=u; localStorage.setItem('vw_backend',u); toast('Backend URL opgeslagen'); }
+});
+document.getElementById('save-token-btn').addEventListener('click', () => {
+  const t = document.getElementById('settings-token').value.trim();
+  if (t) { S.token=t; localStorage.setItem('vw_token',t); toast('Token opgeslagen'); }
+});
+document.getElementById('clear-data-btn').addEventListener('click', () => {
+  if (!confirm('Weet je zeker dat je alle artiesten, releases en deals wil wissen?')) return;
+  S.artists=[]; S.releases=[]; S.deals=[]; S.lastSync=null;
+  ['vw_artists','vw_releases','vw_deals','vw_last_sync'].forEach(k=>localStorage.removeItem(k));
+  renderArtists(); renderReleases(); renderDeals(); toast('Data gewist');
+});
+
+// ── RENDER ────────────────────────────────────
+function renderArtists() {
+  const list = document.getElementById('artist-list');
+  const empty = document.getElementById('artists-empty');
+  document.getElementById('artist-count').textContent = S.artists.length ? `${S.artists.length} artiest(en)` : '';
+  if (!S.artists.length) { list.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  list.innerHTML = S.artists.map(a=>`
+    <div class="artist-card">
+      <div><div class="artist-name">${esc(a.name)}</div><div class="artist-meta">Discogs ID ${a.id}</div></div>
+      <button class="remove-btn" data-id="${a.id}">×</button>
+    </div>`).join('');
+  list.querySelectorAll('.remove-btn').forEach(btn=>btn.addEventListener('click',()=>removeArtist(parseInt(btn.dataset.id))));
+}
+
+function renderReleases() {
+  const list=document.getElementById('releases-list'), empty=document.getElementById('releases-empty'), badge=document.getElementById('badge-r');
+  document.getElementById('sync-info-r').textContent = sinceText(S.lastSync);
+  if (!S.releases.length) { list.innerHTML=''; empty.style.display='block'; badge.style.display='none'; return; }
+  empty.style.display='none'; badge.textContent=S.releases.length>99?'99+':S.releases.length; badge.style.display='block';
+  list.innerHTML = S.releases.map(r=>`
+    <a class="result-card" href="${r.uri}" target="_blank" rel="noopener">
+      ${r.thumb?`<img class="result-thumb" src="${r.thumb}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
+      <div class="result-info">
+        <div class="result-title">${esc(r.title)}</div>
+        <div class="result-artist">${esc(r.artistName)}</div>
+        <div class="result-shop">${r.year||'?'} · Discogs · ${r.numForSale||0} te koop</div>
+        ${r.lowestPrice?`<div class="result-shop">Laagste: €${r.lowestPrice.toFixed(2)}</div>`:''}
+      </div>
+    </a>`).join('');
+}
+
+function renderDeals() {
+  const list=document.getElementById('deals-list'), empty=document.getElementById('deals-empty'), badge=document.getElementById('badge-d');
+  document.getElementById('sync-info-d').textContent = sinceText(S.lastSync);
+  if (!S.deals.length) { list.innerHTML=''; empty.style.display='block'; badge.style.display='none'; return; }
+  empty.style.display='none'; badge.textContent=S.deals.length; badge.style.display='block';
+  list.innerHTML = S.deals.map(d=>`
+    <a class="result-card deal" href="${d.url}" target="_blank" rel="noopener">
+      ${d.thumb?`<img class="result-thumb" src="${d.thumb}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
+      <div class="result-info">
+        <div class="result-title">${esc(d.title||d.artistName)}</div>
+        <div class="result-artist">${esc(d.artistName)}</div>
+        <div class="result-shop">${esc(d.shop||'Discogs')} · ${esc(d.shipping_note||'')}</div>
+        <span class="deal-badge">−${d.discount_pct}% deal</span>
+      </div>
+      <div class="price-col">
+        <div class="price-now">€${(d.price_eur||0).toFixed(2)}</div>
+        ${d.medianPrice?`<div class="price-was">€${d.medianPrice.toFixed(2)}</div>`:''}
+        <div class="price-pct">−${d.discount_pct}%</div>
+      </div>
+    </a>`).join('');
+}
+
+// ── INIT ─────────────────────────────────────
+function showApp() {
+  document.getElementById('setup-view').style.display='none';
+  const m=document.getElementById('main-app'); m.style.display='flex';
+  document.getElementById('settings-backend-url').value = S.backendUrl;
+  renderArtists(); renderReleases(); renderDeals();
+  wakeBackend();
+}
+
+if (S.token && S.username && S.backendUrl) showApp();
+
+if ('serviceWorker' in navigator) window.addEventListener('load', ()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
