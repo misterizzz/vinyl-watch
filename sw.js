@@ -1,8 +1,9 @@
-const CACHE = 'vinylwatch-v1';
-const STATIC = ['/', '/index.html', '/manifest.json', '/icon.svg', '/sw.js'];
+const CACHE = 'vinylwatch-v2';
+const BASE = '/vinyl-watch';
+const STATIC = [BASE + '/', BASE + '/index.html', BASE + '/manifest.json', BASE + '/icon.svg'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC).catch(() => {})));
   self.skipWaiting();
 });
 
@@ -16,25 +17,21 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Discogs API: network first, no cache (live data)
-  if (url.hostname === 'api.discogs.com') {
+  if (url.hostname === 'api.discogs.com' || url.hostname.includes('onrender.com')) {
     e.respondWith(fetch(e.request).catch(() => new Response(
-      JSON.stringify({ error: 'offline' }), 
+      JSON.stringify({ error: 'offline' }),
       { headers: { 'Content-Type': 'application/json' } }
     )));
     return;
   }
 
-  // Google Fonts: cache first
   if (url.hostname.includes('fonts')) {
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
-      const clone = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
+      caches.open(CACHE).then(c => c.put(e.request, res.clone()));
       return res;
     })));
     return;
   }
 
-  // Static files: cache first, fallback to network
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
 });
