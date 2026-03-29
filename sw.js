@@ -1,13 +1,11 @@
-const CACHE = 'vinylwatch-v3';
+const CACHE = 'vinylwatch-v4';
 const BASE = '/vinyl-watch';
 
 self.addEventListener('install', e => {
-  // Skip waiting immediately — don't hold on to old version
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  // Delete all old caches
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
@@ -29,15 +27,13 @@ self.addEventListener('fetch', e => {
   }
 
   // App files: network first, fall back to cache
-  // This means updates are always picked up when online
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        // Cache the fresh response
         const clone = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, clone));
         return res;
       })
       .catch(() => caches.match(e.request))
   );
-});});
+});

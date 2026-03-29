@@ -334,6 +334,16 @@
           </div>
         </div>
         <div class="setup-card" style="margin-bottom:10px;">
+          <h2>Automatisch verversen</h2>
+          <p style="font-size:13px;color:var(--muted);">Sync automatisch bij openen als data ouder is dan:</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn sm secondary" data-autosync="6">6 uur</button>
+            <button class="btn sm" data-autosync="12">12 uur</button>
+            <button class="btn sm secondary" data-autosync="24">24 uur</button>
+            <button class="btn sm secondary" data-autosync="0">Uit</button>
+          </div>
+        </div>
+        <div class="setup-card" style="margin-bottom:10px;">
           <h2>Backend URL</h2>
           <input type="url" id="settings-backend-url" placeholder="https://vinyl-backend-xxxx.onrender.com">
           <button class="btn sm" id="save-backend-btn" style="margin-top:4px;">Opslaan</button>
@@ -1433,6 +1443,45 @@ function notifyDeals(count) {
   }
 }
 
+// ── AUTO-SYNC SETTINGS ──────────────────────
+const AUTO_SYNC_DEFAULT = 12; // hours
+
+function getAutoSyncHours() {
+  const v = localStorage.getItem('vw_autosync');
+  return v !== null ? parseInt(v) : AUTO_SYNC_DEFAULT;
+}
+
+function updateAutoSyncButtons() {
+  const h = getAutoSyncHours();
+  document.querySelectorAll('[data-autosync]').forEach(btn => {
+    const v = parseInt(btn.dataset.autosync);
+    btn.className = v === h ? 'btn sm' : 'btn sm secondary';
+  });
+}
+
+document.querySelectorAll('[data-autosync]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const h = parseInt(btn.dataset.autosync);
+    localStorage.setItem('vw_autosync', h);
+    updateAutoSyncButtons();
+    toast(h ? `Auto-sync elke ${h} uur` : 'Auto-sync uitgeschakeld');
+  });
+});
+
+function isDataStale() {
+  const hours = getAutoSyncHours();
+  if (!hours || !S.lastSync) return !!hours; // if no sync yet but auto-sync on, sync
+  const age = (Date.now() - new Date(S.lastSync).getTime()) / 3600000;
+  return age >= hours;
+}
+
+function tryAutoSync() {
+  if (!S.syncing && (S.artists.length || S.albums.length) && isDataStale()) {
+    toast('Auto-sync gestart…', 2000);
+    startSync();
+  }
+}
+
 // ── INIT ─────────────────────────────────────
 function showApp() {
   document.getElementById('setup-view').style.display='none';
@@ -1440,8 +1489,19 @@ function showApp() {
   document.getElementById('settings-backend-url').value = S.backendUrl;
   renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases();
   updateThemeButtons();
+  updateAutoSyncButtons();
   wakeBackend();
+
+  // Auto-sync on app open if data is stale
+  setTimeout(tryAutoSync, 2000);
 }
+
+// Auto-sync when app returns to foreground
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.token && S.backendUrl) {
+    tryAutoSync();
+  }
+});
 
 if (S.token && S.username && S.backendUrl) showApp();
 
