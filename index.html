@@ -121,6 +121,16 @@
     .upload-zone { border: 2px dashed var(--border); border-radius: 6px; padding: 20px; text-align: center; cursor: pointer; transition: border-color 0.2s; font-size: 13px; color: var(--muted); }
     .upload-zone:hover, .upload-zone.drag { border-color: var(--gold); color: var(--gold); }
     .upload-zone input { display: none; }
+
+    /* FILTERS */
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 11px; }
+    .filter-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 4px 11px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .filter-pill.active { border-color: var(--gold); color: var(--gold); background: var(--surface2); }
+    .filter-pill:hover { border-color: var(--gold-dim); }
+    .filter-section { margin-bottom: 6px; }
+    .filter-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .subsection-title { font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--green); margin: 16px 0 8px; display: flex; align-items: center; gap: 6px; }
+    .subsection-title .count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-weight: 400; }
   </style>
 </head>
 <body>
@@ -200,6 +210,23 @@
           <div class="ei">🎵</div><h3>Nog geen artiesten</h3>
           <p>Importeer je Apple Music bibliotheek of zoek een artiest.</p>
         </div>
+
+        <div style="margin-top:18px;">
+          <div class="action-card" id="search-album-btn" style="margin-bottom:13px;">
+            <div class="ac-icon">💿</div>
+            <div class="ac-title">Album volgen</div>
+            <div class="ac-desc">Zoek een specifiek album om deals te vinden</div>
+          </div>
+          <div class="section-header">
+            <div class="section-title">Gevolgde albums</div>
+            <span id="album-count" style="font-size:11px;color:var(--muted);"></span>
+          </div>
+          <div id="album-list"></div>
+          <div id="albums-empty" class="empty" style="display:none;">
+            <div class="ei">💿</div><h3>Nog geen albums</h3>
+            <p>Zoek een album om te volgen en deals te vinden.</p>
+          </div>
+        </div>
       </div>
 
       <div class="view" id="view-releases">
@@ -215,12 +242,44 @@
 
       <div class="view" id="view-deals">
         <div class="section-title">Aanbiedingen</div>
-        <div class="meta-label">≥30% onder mediaanprijs · Discogs · HHV · Juno · Rough Trade · eBay</div>
+        <div class="meta-label">≥30% onder mediaanprijs · alle winkels</div>
+
+        <div class="filter-bar" id="filter-bar">
+          <div class="filter-section" style="width:100%;">
+            <div class="filter-label">Bron</div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;">
+              <button class="filter-pill active" data-filter="shop" data-value="all">Alle</button>
+              <button class="filter-pill" data-filter="shop" data-value="discogs">Discogs</button>
+              <button class="filter-pill" data-filter="shop" data-value="shops">Webshops</button>
+            </div>
+          </div>
+          <div class="filter-section" style="width:100%;margin-top:4px;">
+            <div class="filter-label">Min. conditie</div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;">
+              <button class="filter-pill" data-filter="cond" data-value="M">M</button>
+              <button class="filter-pill" data-filter="cond" data-value="NM">NM</button>
+              <button class="filter-pill active" data-filter="cond" data-value="VG+">VG+</button>
+              <button class="filter-pill" data-filter="cond" data-value="VG">VG</button>
+              <button class="filter-pill" data-filter="cond" data-value="all">Alle</button>
+            </div>
+          </div>
+        </div>
+
         <div id="wake-d" class="wake-banner">⏳ Backend opstart… eerste keer kan 30–60 sec duren.</div>
-        <div id="deals-list"></div>
+
+        <div id="budget-section" style="display:none;">
+          <div class="subsection-title">💰 Budget deals ≤€25 <span class="count" id="budget-count"></span></div>
+          <div id="budget-deals-list"></div>
+        </div>
+
+        <div id="other-section">
+          <div class="subsection-title" id="other-deals-title" style="display:none;">🏷 Overige deals <span class="count" id="other-count"></span></div>
+          <div id="deals-list"></div>
+        </div>
+
         <div id="deals-empty" class="empty" style="display:none;">
           <div class="ei">💰</div><h3>Geen deals gevonden</h3>
-          <p>Op dit moment geen platen voor 30%+ korting.</p>
+          <p>Op dit moment geen platen die aan je filters voldoen.</p>
         </div>
         <div id="sync-info-d" class="sync-info"></div>
       </div>
@@ -326,6 +385,19 @@
   </div>
 </div>
 
+<!-- ALBUM SEARCH OVERLAY -->
+<div class="overlay" id="album-overlay">
+  <div class="sheet">
+    <div class="sheet-title">Album zoeken</div>
+    <div class="search-row">
+      <input type="text" id="album-search-input" placeholder="Bijv. Kind of Blue…" autocomplete="off">
+      <button class="search-submit" id="album-search-submit">Zoek</button>
+    </div>
+    <div class="search-results" id="album-search-results"></div>
+    <button class="btn secondary" id="close-album-search">Sluiten</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -341,9 +413,17 @@ const S = {
   deals:      JSON.parse(localStorage.getItem('vw_deals') || '[]'),
   labels:     JSON.parse(localStorage.getItem('vw_labels') || '[]'),
   labelReleases: JSON.parse(localStorage.getItem('vw_label_releases') || '[]'),
+  albums:     JSON.parse(localStorage.getItem('vw_albums') || '[]'),
   lastSync:   localStorage.getItem('vw_last_sync') || null,
   syncing:    false,
 };
+
+const FILTERS = {
+  shop: 'all',
+  cond: 'VG+',
+};
+
+const COND_RANK = { 'M': 5, 'NM': 4, 'NM or M-': 4, 'Nieuw': 4, 'VG+': 3, 'VG': 2, '?': 3 };
 
 const save = () => {
   localStorage.setItem('vw_artists',  JSON.stringify(S.artists));
@@ -351,6 +431,7 @@ const save = () => {
   localStorage.setItem('vw_deals',    JSON.stringify(S.deals));
   localStorage.setItem('vw_labels', JSON.stringify(S.labels));
   localStorage.setItem('vw_label_releases', JSON.stringify(S.labelReleases));
+  localStorage.setItem('vw_albums', JSON.stringify(S.albums));
   if (S.lastSync) localStorage.setItem('vw_last_sync', S.lastSync);
 };
 
@@ -571,7 +652,7 @@ document.getElementById('sync-btn').addEventListener('click', startSync);
 
 async function startSync() {
   if (S.syncing) return;
-  if (!S.artists.length) { toast('Voeg eerst artiesten toe'); return; }
+  if (!S.artists.length && !S.albums.length) { toast('Voeg eerst artiesten of albums toe'); return; }
   S.syncing = true; S.releases = []; S.deals = [];
   const btn = document.getElementById('sync-btn');
   const label = document.getElementById('sync-label');
@@ -581,10 +662,13 @@ async function startSync() {
   wakeBackend();
 
   const yr = new Date().getFullYear();
+  const totalSteps = S.artists.length + S.albums.length;
+  let step = 0;
 
   for (let i = 0; i < S.artists.length; i++) {
     const artist = S.artists[i];
-    label.textContent = `${i+1}/${S.artists.length}`;
+    step++;
+    label.textContent = `${step}/${totalSteps}`;
     try {
       const data = await discogsGet(`/artists/${artist.id}/releases?sort=year&sort_order=desc&per_page=50`);
       await delay(DELAY);
@@ -602,7 +686,7 @@ async function startSync() {
           const obj = { id:rel.id, artistId:artist.id, artistName:artist.name, title:det.title, year:det.year, thumb:det.thumb||det.images?.[0]?.resource_url||'', uri:`https://www.discogs.com/release/${rel.id}`, lowestPrice:det.lowest_price||0, medianPrice:median, numForSale:det.num_for_sale||0 };
           S.releases.push(obj);
           if (median && det.lowest_price && det.lowest_price <= median*0.70) {
-            S.deals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace' });
+            S.deals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace', condition:'?' });
           }
         } catch(_){}
       }
@@ -612,11 +696,38 @@ async function startSync() {
         try {
           const shopResults = await backendSearch(artist.name, '', medianPrice);
           shopResults.filter(r=>r.is_deal).forEach(d => {
-            S.deals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note });
+            S.deals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur });
           });
         } catch(e){ console.warn(`Backend fout ${artist.name}:`, e.message); }
       }
     } catch(err){ console.warn(`Fout ${artist.name}:`, err.message); }
+  }
+
+  // Sync followed albums
+  for (const album of S.albums) {
+    step++;
+    label.textContent = `${step}/${totalSteps}`;
+    try {
+      let median = album.medianPrice || 0;
+      if (album.releaseId) {
+        try {
+          await delay(DELAY);
+          const st = await discogsGet(`/marketplace/stats/${album.releaseId}?curr_abbr=EUR`);
+          median = st.median_price?.value || 0;
+          if (median && st.lowest_price?.value && st.lowest_price.value <= median*0.70) {
+            S.deals.push({ artistName:album.artist, title:album.title, shop:'Discogs', price_eur:st.lowest_price.value, discount_pct:Math.round((1-st.lowest_price.value/median)*100), medianPrice:median, url:`https://www.discogs.com/sell/list?release_id=${album.releaseId}&sort=price%2Casc`, thumb:album.thumb, shipping_note:'Zie Discogs marketplace', condition:'?', total_price:st.lowest_price.value, fromAlbum:true });
+          }
+        } catch(_){}
+      }
+      if (S.backendUrl) {
+        try {
+          const shopResults = await backendSearch(album.artist, album.title, median);
+          shopResults.forEach(d => {
+            S.deals.push({ artistName:album.artist, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct||0, medianPrice:median, url:d.url, thumb:d.image_url||album.thumb, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur, fromAlbum:true });
+          });
+        } catch(e){ console.warn(`Album backend fout ${album.title}:`, e.message); }
+      }
+    } catch(err){ console.warn(`Album fout ${album.title}:`, err.message); }
   }
 
   await syncLabels();
@@ -642,10 +753,9 @@ document.getElementById('save-token-btn').addEventListener('click', () => {
 });
 document.getElementById('clear-data-btn').addEventListener('click', () => {
   if (!confirm('Weet je zeker dat je alle artiesten, releases en deals wil wissen?')) return;
-  S.artists=[]; S.releases=[]; S.deals=[]; S.lastSync=null;
-  ['vw_artists','vw_releases','vw_deals','vw_labels','vw_label_releases','vw_last_sync'].forEach(k=>localStorage.removeItem(k));
-  S.labels=[]; S.labelReleases=[];
-  renderArtists(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases(); toast('Data gewist');
+  S.artists=[]; S.releases=[]; S.deals=[]; S.lastSync=null; S.albums=[]; S.labels=[]; S.labelReleases=[];
+  ['vw_artists','vw_releases','vw_deals','vw_labels','vw_label_releases','vw_albums','vw_last_sync'].forEach(k=>localStorage.removeItem(k));
+  renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases(); toast('Data gewist');
 });
 
 // ── RENDER ────────────────────────────────────
@@ -680,26 +790,189 @@ function renderReleases() {
     </a>`).join('');
 }
 
+function filterDeals() {
+  let filtered = S.deals;
+
+  // Shop filter
+  if (FILTERS.shop === 'discogs') {
+    filtered = filtered.filter(d => (d.shop||'Discogs').toLowerCase() === 'discogs');
+  } else if (FILTERS.shop === 'shops') {
+    filtered = filtered.filter(d => (d.shop||'Discogs').toLowerCase() !== 'discogs');
+  }
+
+  // Condition filter
+  if (FILTERS.cond !== 'all') {
+    const minRank = COND_RANK[FILTERS.cond] || 0;
+    filtered = filtered.filter(d => {
+      const cond = d.condition || '?';
+      const rank = COND_RANK[cond];
+      return rank === undefined || rank >= minRank;
+    });
+  }
+
+  return filtered;
+}
+
+function dealCardHtml(d) {
+  const price = d.total_price || d.price_eur || 0;
+  const condLabel = d.condition && d.condition !== '?' ? ` · ${esc(d.condition)}` : '';
+  return `<a class="result-card deal" href="${d.url}" target="_blank" rel="noopener">
+    ${d.thumb?`<img class="result-thumb" src="${d.thumb}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
+    <div class="result-info">
+      <div class="result-title">${esc(d.title||d.artistName)}</div>
+      <div class="result-artist">${esc(d.artistName)}</div>
+      <div class="result-shop">${esc(d.shop||'Discogs')}${condLabel} · ${esc(d.shipping_note||'')}</div>
+      ${d.discount_pct>0?`<span class="deal-badge">−${d.discount_pct}% deal</span>`:''}
+    </div>
+    <div class="price-col">
+      <div class="price-now">€${price.toFixed(2)}</div>
+      ${d.medianPrice?`<div class="price-was">€${d.medianPrice.toFixed(2)}</div>`:''}
+      ${d.discount_pct>0?`<div class="price-pct">−${d.discount_pct}%</div>`:''}
+    </div>
+  </a>`;
+}
+
 function renderDeals() {
-  const list=document.getElementById('deals-list'), empty=document.getElementById('deals-empty'), badge=document.getElementById('badge-d');
+  const list = document.getElementById('deals-list');
+  const budgetList = document.getElementById('budget-deals-list');
+  const budgetSection = document.getElementById('budget-section');
+  const otherTitle = document.getElementById('other-deals-title');
+  const empty = document.getElementById('deals-empty');
+  const badge = document.getElementById('badge-d');
   document.getElementById('sync-info-d').textContent = sinceText(S.lastSync);
-  if (!S.deals.length) { list.innerHTML=''; empty.style.display='block'; badge.style.display='none'; return; }
-  empty.style.display='none'; badge.textContent=S.deals.length; badge.style.display='block';
-  list.innerHTML = S.deals.map(d=>`
-    <a class="result-card deal" href="${d.url}" target="_blank" rel="noopener">
-      ${d.thumb?`<img class="result-thumb" src="${d.thumb}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
-      <div class="result-info">
-        <div class="result-title">${esc(d.title||d.artistName)}</div>
-        <div class="result-artist">${esc(d.artistName)}</div>
-        <div class="result-shop">${esc(d.shop||'Discogs')} · ${esc(d.shipping_note||'')}</div>
-        <span class="deal-badge">−${d.discount_pct}% deal</span>
+
+  const filtered = filterDeals();
+
+  if (!filtered.length) {
+    list.innerHTML = ''; budgetList.innerHTML = '';
+    budgetSection.style.display = 'none'; otherTitle.style.display = 'none';
+    empty.style.display = 'block'; badge.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  badge.textContent = filtered.length; badge.style.display = 'block';
+
+  const budget = filtered.filter(d => (d.total_price || d.price_eur || 0) <= 25);
+  const other = filtered.filter(d => (d.total_price || d.price_eur || 0) > 25);
+
+  if (budget.length) {
+    budgetSection.style.display = 'block';
+    document.getElementById('budget-count').textContent = `(${budget.length})`;
+    budgetList.innerHTML = budget.map(dealCardHtml).join('');
+  } else {
+    budgetSection.style.display = 'none';
+  }
+
+  if (budget.length && other.length) {
+    otherTitle.style.display = 'flex';
+    document.getElementById('other-count').textContent = `(${other.length})`;
+    list.innerHTML = other.map(dealCardHtml).join('');
+  } else if (!budget.length) {
+    otherTitle.style.display = 'none';
+    list.innerHTML = filtered.map(dealCardHtml).join('');
+  } else {
+    otherTitle.style.display = 'none';
+    list.innerHTML = '';
+  }
+}
+
+// ── FILTER EVENTS ────────────────────────────
+document.getElementById('filter-bar').addEventListener('click', e => {
+  const pill = e.target.closest('.filter-pill');
+  if (!pill) return;
+  const type = pill.dataset.filter;
+  const value = pill.dataset.value;
+  FILTERS[type] = value;
+  pill.parentElement.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  renderDeals();
+});
+
+// ── ALBUMS ───────────────────────────────────
+document.getElementById('search-album-btn').addEventListener('click', () => {
+  document.getElementById('album-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('album-search-input').focus(), 300);
+});
+document.getElementById('close-album-search').addEventListener('click', closeAlbumSearch);
+document.getElementById('album-overlay').addEventListener('click', e => { if (e.target.id === 'album-overlay') closeAlbumSearch(); });
+document.getElementById('album-search-input').addEventListener('keydown', e => { if (e.key === 'Enter') doAlbumSearch(); });
+document.getElementById('album-search-submit').addEventListener('click', doAlbumSearch);
+
+function closeAlbumSearch() {
+  document.getElementById('album-overlay').classList.remove('open');
+  document.getElementById('album-search-results').innerHTML = '';
+  document.getElementById('album-search-input').value = '';
+}
+
+async function doAlbumSearch() {
+  const q = document.getElementById('album-search-input').value.trim();
+  if (!q) return;
+  const el = document.getElementById('album-search-results');
+  el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">Zoeken…</div>';
+  try {
+    const d = await discogsGet(`/database/search?q=${encodeURIComponent(q)}&type=release&format=vinyl&per_page=15`);
+    const results = d.results || [];
+    if (!results.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">Geen resultaten.</div>'; return; }
+    el.innerHTML = results.map(r => {
+      const added = S.albums.some(a => a.releaseId === r.id);
+      return `<div class="search-result" data-id="${r.id}" data-title="${esc(r.title)}" data-thumb="${r.thumb||''}" data-year="${r.year||''}">
+        <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
+          ${r.thumb?`<img src="${r.thumb}" style="width:36px;height:36px;border-radius:3px;flex-shrink:0;" loading="lazy">`:''}
+          <div style="min-width:0;"><div class="sr-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.title)}</div><div class="sr-meta">${r.year||'?'} · ${esc(r.format?.[0]||'Vinyl')}</div></div>
+        </div>
+        <button class="add-btn" ${added?'disabled style="opacity:.4"':''}>${added?'✓':'+ Volgen'}</button>
+      </div>`;
+    }).join('');
+    el.querySelectorAll('.add-btn:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.search-result');
+        const title = row.dataset.title;
+        const parts = title.split(' - ');
+        addAlbum({
+          releaseId: parseInt(row.dataset.id),
+          artist: parts.length > 1 ? parts[0].trim() : '',
+          title: parts.length > 1 ? parts.slice(1).join(' - ').trim() : title,
+          thumb: row.dataset.thumb,
+          year: row.dataset.year,
+        });
+        btn.textContent = '✓'; btn.disabled = true; btn.style.opacity = '.4';
+      });
+    });
+  } catch (err) {
+    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${err.message}</div>`;
+  }
+}
+
+function addAlbum(album) {
+  if (S.albums.some(a => a.releaseId === album.releaseId)) return;
+  S.albums.push({ ...album, addedAt: new Date().toISOString() });
+  save(); renderAlbums(); toast(`${album.title} toegevoegd`);
+}
+
+function removeAlbum(releaseId) {
+  S.albums = S.albums.filter(a => a.releaseId !== releaseId);
+  S.deals = S.deals.filter(d => !d.fromAlbum || d.title !== S.albums.find(a=>a.releaseId===releaseId)?.title);
+  save(); renderAlbums(); renderDeals();
+}
+
+function renderAlbums() {
+  const list = document.getElementById('album-list');
+  const empty = document.getElementById('albums-empty');
+  document.getElementById('album-count').textContent = S.albums.length ? `${S.albums.length} album(s)` : '';
+  if (!S.albums.length) { list.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  list.innerHTML = S.albums.map(a => `
+    <div class="artist-card">
+      <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
+        ${a.thumb?`<img src="${a.thumb}" style="width:36px;height:36px;border-radius:3px;flex-shrink:0;" loading="lazy">`:''}
+        <div style="min-width:0;">
+          <div class="artist-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.title)}</div>
+          <div class="artist-meta">${esc(a.artist)}${a.year?' · '+a.year:''}</div>
+        </div>
       </div>
-      <div class="price-col">
-        <div class="price-now">€${(d.price_eur||0).toFixed(2)}</div>
-        ${d.medianPrice?`<div class="price-was">€${d.medianPrice.toFixed(2)}</div>`:''}
-        <div class="price-pct">−${d.discount_pct}%</div>
-      </div>
-    </a>`).join('');
+      <button class="remove-btn" data-id="${a.releaseId}">×</button>
+    </div>`).join('');
+  list.querySelectorAll('.remove-btn').forEach(btn => btn.addEventListener('click', () => removeAlbum(parseInt(btn.dataset.id))));
 }
 
 
@@ -829,13 +1102,13 @@ function showApp() {
   document.getElementById('setup-view').style.display='none';
   const m=document.getElementById('main-app'); m.style.display='flex';
   document.getElementById('settings-backend-url').value = S.backendUrl;
-  renderArtists(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases();
+  renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases();
   wakeBackend();
 }
 
 if (S.token && S.username && S.backendUrl) showApp();
 
-if ('serviceWorker' in navigator) window.addEventListener('load', ()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+if ('serviceWorker' in navigator) window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
 </body>
 </html>
