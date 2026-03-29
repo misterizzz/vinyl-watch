@@ -98,9 +98,9 @@
     .overflow-menu button:hover { background: var(--border); }
     .overflow-menu button.danger { color: var(--red); }
     .swipe-wrapper { position: relative; overflow: hidden; border-radius: 10px; margin-bottom: 5px; }
-    .swipe-delete { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--red); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 12px; font-weight: 600; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+    .swipe-delete { position: absolute; right: 0; top: 0; height: 100%; width: 80px; background: var(--red); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 12px; font-weight: 600; border-radius: 0 10px 10px 0; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
     .swipe-wrapper.swiping .swipe-delete { opacity: 1; pointer-events: auto; }
-    .swipe-inner { position: relative; transition: transform 0.2s; background: var(--surface); z-index: 1; }
+    .swipe-inner { position: relative; transition: transform 0.2s; background: var(--surface); z-index: 1; border-radius: 10px; }
     .artist-card.inactive { opacity: 0.4; }
     .type-badge { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; display: inline-block; }
     .type-badge.artist { background: var(--accent-dim); color: var(--accent); }
@@ -1087,11 +1087,22 @@ document.getElementById('volgen-list').addEventListener('click', e => {
 // Swipe-to-delete touch handling
 (function() {
   const list = document.getElementById('volgen-list');
-  let startX = 0, currentInner = null, swiping = false;
+  let startX = 0, currentInner = null, swiping = false, _openSwipe = null;
+
+  function closeOpenSwipe() {
+    if (_openSwipe) {
+      _openSwipe.style.transition = 'transform 0.2s';
+      _openSwipe.style.transform = '';
+      _openSwipe.parentElement.classList.remove('swiping');
+      _openSwipe = null;
+    }
+  }
 
   list.addEventListener('touchstart', e => {
     const inner = e.target.closest('.swipe-inner');
     if (!inner) return;
+    // If tapping on a different card while one is open, close it
+    if (_openSwipe && _openSwipe !== inner) { closeOpenSwipe(); }
     startX = e.touches[0].clientX;
     currentInner = inner;
     currentInner.style.transition = 'none';
@@ -1100,7 +1111,14 @@ document.getElementById('volgen-list').addEventListener('click', e => {
   list.addEventListener('touchmove', e => {
     if (!currentInner || !startX) return;
     const dx = e.touches[0].clientX - startX;
-    if (dx < -10) {
+    const isOpen = _openSwipe === currentInner;
+    if (isOpen) {
+      // Already open: allow swiping right to close
+      const newX = Math.min(0, Math.max(-80, -80 + dx));
+      currentInner.style.transform = `translateX(${newX}px)`;
+      swiping = true;
+    } else if (dx < -10) {
+      // Closed: swipe left to open
       swiping = true;
       currentInner.parentElement.classList.add('swiping');
       currentInner.style.transform = `translateX(${Math.max(dx, -80)}px)`;
@@ -1110,12 +1128,17 @@ document.getElementById('volgen-list').addEventListener('click', e => {
   list.addEventListener('touchend', () => {
     if (!currentInner) return;
     currentInner.style.transition = 'transform 0.2s';
-    const tx = parseInt(currentInner.style.transform.replace(/[^-\d]/g, '') || '0');
-    if (tx <= -60) {
+    const tx = parseFloat(currentInner.style.transform.replace(/[^-.\d]/g, '') || '0');
+    if (tx <= -40) {
+      // Snap open
       currentInner.style.transform = 'translateX(-80px)';
+      currentInner.parentElement.classList.add('swiping');
+      _openSwipe = currentInner;
     } else {
+      // Snap closed
       currentInner.style.transform = '';
       currentInner.parentElement.classList.remove('swiping');
+      if (_openSwipe === currentInner) _openSwipe = null;
     }
     setTimeout(() => { swiping = false; }, 50);
     currentInner = null; startX = 0;
