@@ -1435,11 +1435,14 @@ document.getElementById('search-deals-all-btn').addEventListener('click', async 
 
   const favOnly = FILTERS.sel === 'fav';
   const match = x => x.active !== false && (!favOnly || x.fav);
+  const allArtists = S.artists.filter(a => a.active !== false);
+  const favArtists = S.artists.filter(a => a.fav);
+  console.log('Zoek deals:', { favOnly, total: allArtists.length, favs: favArtists.length, favNames: favArtists.map(a=>a.name), sel: FILTERS.sel });
   const artists = S.artists.filter(match);
   const albums = S.albums.filter(match);
   const items = [...artists.map(a => ({ name: a.name, title: '' })), ...albums.map(a => ({ name: a.artist, title: a.title }))];
 
-  if (!items.length) { toast(favOnly ? 'Markeer eerst items als favoriet (via ⋮ menu)' : 'Geen actieve artiesten of albums'); btn.disabled = false; return; }
+  if (!items.length) { toast(favOnly ? `Geen favorieten gevonden (${favArtists.length} fav van ${allArtists.length} actief)` : 'Geen actieve artiesten of albums'); btn.disabled = false; return; }
 
   const newDeals = [];
   wakeBackend();
