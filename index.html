@@ -293,8 +293,11 @@
 
       <!-- DEALS (all: artists + labels + albums) -->
       <div class="view" id="view-deals">
-        <div class="section-title">Aanbiedingen</div>
-        <div class="meta-label">Deals van artiesten, labels en albums · alle winkels</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div class="section-title">Aanbiedingen</div>
+          <button class="add-pill" id="search-deals-all-btn" style="flex:none;padding:6px 14px;">💰 Zoek deals</button>
+        </div>
+        <div class="meta-label" id="deals-meta">Deals van artiesten, labels en albums · alle winkels</div>
 
         <div class="filter-bar" id="filter-bar">
           <div style="display:flex;gap:16px;width:100%;">
@@ -1421,6 +1424,52 @@ document.getElementById('discount-slider').addEventListener('input', e => {
   DEAL_THRESHOLD = 1 - (pct / 100);
   localStorage.setItem('vw_discount', pct);
   renderDeals();
+});
+
+// ── DEALS SEARCH ─────────────────────────────
+document.getElementById('search-deals-all-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('search-deals-all-btn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const origText = btn.textContent;
+  const meta = document.getElementById('deals-meta');
+
+  const favOnly = FILTERS.sel === 'fav';
+  const artists = S.artists.filter(a => a.active !== false && (!favOnly || a.fav));
+  const albums = S.albums.filter(a => a.active !== false && (!favOnly || a.fav));
+  const items = [...artists.map(a => ({ name: a.name, title: '' })), ...albums.map(a => ({ name: a.artist, title: a.title }))];
+
+  if (!items.length) { toast('Geen actieve artiesten of albums'); btn.disabled = false; return; }
+
+  const newDeals = [];
+  wakeBackend();
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    btn.textContent = `⏳ ${i+1}/${items.length}`;
+    meta.textContent = `Zoeken: ${item.name.slice(0, 20)}…`;
+    try {
+      const results = await backendSearch(item.name, item.title, 0);
+      results.forEach(d => {
+        newDeals.push({ artistName: item.name, title: d.title, shop: d.shop, price_eur: d.price_eur, discount_pct: d.discount_pct || 0, medianPrice: 0, url: d.url, thumb: d.image_url, shipping_note: d.shipping_note, condition: d.condition || '?', total_price: d.total_price || d.price_eur });
+      });
+    } catch (_) {}
+  }
+
+  // Dedup and merge with existing deals
+  const seen = new Set(S.deals.map(d => `${d.shop}|${d.url}`));
+  for (const d of newDeals) {
+    const key = `${d.shop}|${d.url}`;
+    if (!seen.has(key)) { S.deals.push(d); seen.add(key); }
+  }
+  S.deals.sort((a, b) => (b.discount_pct || 0) - (a.discount_pct || 0));
+  save();
+  renderDeals();
+
+  btn.textContent = origText;
+  btn.disabled = false;
+  meta.textContent = `${S.deals.length} deals gevonden · alle winkels`;
+  toast(`${newDeals.length} resultaten uit webshops`);
 });
 
 // ── ALBUMS ───────────────────────────────────
