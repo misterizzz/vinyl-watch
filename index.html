@@ -471,6 +471,7 @@
 <script>
 const DISCOGS = 'https://api.discogs.com';
 const DELAY = 700;
+const DEAL_THRESHOLD = 0.70; // price <= median * this = deal
 
 const S = {
   token:      localStorage.getItem('vw_token') || '',
@@ -501,6 +502,7 @@ const save = () => {
   localStorage.setItem('vw_label_releases', JSON.stringify(S.labelReleases));
   localStorage.setItem('vw_albums', JSON.stringify(S.albums));
   if (S.lastSync) localStorage.setItem('vw_last_sync', S.lastSync);
+  _favSet = null; // invalidate fav cache
 };
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
@@ -760,7 +762,7 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
         try { await delay(DELAY); const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`); median = st.median_price?.value||0; medianPrice=median; } catch(_){}
         const obj = { id:rel.id, artistId:artist.id, artistName:artist.name, title:det.title, year:det.year, thumb:det.thumb||det.images?.[0]?.resource_url||'', uri:`https://www.discogs.com/release/${rel.id}`, lowestPrice:det.lowest_price||0, medianPrice:median, numForSale:det.num_for_sale||0 };
         newReleases.push(obj);
-        if (median && det.lowest_price && det.lowest_price <= median*0.70) {
+        if (median && det.lowest_price && det.lowest_price <= median*DEAL_THRESHOLD) {
           newDeals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace', condition:'?' });
         }
       } catch(_){}
@@ -820,7 +822,7 @@ async function startSync() {
             await delay(DELAY);
             const st = await discogsGet(`/marketplace/stats/${album.releaseId}?curr_abbr=EUR`);
             median = st.median_price?.value || 0;
-            if (median && st.lowest_price?.value && st.lowest_price.value <= median*0.70) {
+            if (median && st.lowest_price?.value && st.lowest_price.value <= median*DEAL_THRESHOLD) {
               newDeals.push({ artistName:album.artist, title:album.title, shop:'Discogs', price_eur:st.lowest_price.value, discount_pct:Math.round((1-st.lowest_price.value/median)*100), medianPrice:median, url:`https://www.discogs.com/sell/list?release_id=${album.releaseId}&sort=price%2Casc`, thumb:album.thumb, shipping_note:'Zie Discogs marketplace', condition:'?', total_price:st.lowest_price.value, fromAlbum:true });
             }
           } catch(_){}
@@ -1009,32 +1011,29 @@ function renderVolgen() {
     </div>`;
   }).join('');
 
-  // Event listeners
-  list.querySelectorAll('.fav-btn').forEach(btn => btn.addEventListener('click', () => toggleFavorite(btn.dataset.type, parseInt(btn.dataset.id))));
-  list.querySelectorAll('.toggle-btn').forEach(btn => btn.addEventListener('click', () => {
-    const type = btn.dataset.type;
-    const id = parseInt(btn.dataset.id);
+}
+
+// Event delegation for volgen-list (single listener, no leaks)
+document.getElementById('volgen-list').addEventListener('click', e => {
+  const btn = e.target.closest('[data-id]');
+  if (!btn) return;
+  const id = parseInt(btn.dataset.id);
+  const type = btn.dataset.type;
+
+  if (btn.classList.contains('fav-btn')) {
+    toggleFavorite(type, id);
+  } else if (btn.classList.contains('toggle-btn')) {
     if (type === 'artist') toggleArtistActive(id);
     else { const arr = type === 'label' ? S.labels : S.albums; const item = arr.find(x => (x.releaseId||x.id) === id); if (item) { item.active = !(item.active !== false); save(); renderVolgen(); } }
-  }));
-  list.querySelectorAll('.remove-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = parseInt(btn.dataset.id);
-      if (btn.dataset.type === 'artist') removeArtist(id);
-      else if (btn.dataset.type === 'label') removeLabel(id);
-      else removeAlbum(id);
-    });
-  });
-  list.querySelectorAll('.search-deals-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (btn.dataset.type === 'album') {
-        searchAlbumPrices(btn.dataset.name, btn.dataset.title, parseInt(btn.dataset.relid));
-      } else {
-        searchDealsFor(btn.dataset.name, btn.dataset.type);
-      }
-    });
-  });
-}
+  } else if (btn.classList.contains('remove-btn')) {
+    if (type === 'artist') removeArtist(id);
+    else if (type === 'label') removeLabel(id);
+    else removeAlbum(id);
+  } else if (btn.classList.contains('search-deals-btn')) {
+    if (type === 'album') searchAlbumPrices(btn.dataset.name, btn.dataset.title, parseInt(btn.dataset.relid));
+    else searchDealsFor(btn.dataset.name, type);
+  }
+});
 
 // Volgen filter + search
 document.getElementById('volgen-filter-bar').addEventListener('click', e => {
@@ -1057,7 +1056,7 @@ document.getElementById('volgen-search').addEventListener('input', e => {
 let releaseFilter = 'all';
 let releaseSearch = '';
 
-function getAllReleases() {
+function getCachedAllReleases() {
   // Merge artist releases + label releases
   const all = [...S.releases];
   S.labelReleases.forEach(lr => {
@@ -1068,15 +1067,21 @@ function getAllReleases() {
   return all.sort((a,b) => (b.year||0) - (a.year||0));
 }
 
+let _favSet = null;
+function rebuildFavSet() {
+  _favSet = new Set();
+  S.artists.filter(a => a.fav).forEach(a => _favSet.add(a.name));
+  S.labels.filter(l => l.fav).forEach(l => _favSet.add(l.name));
+  S.albums.filter(a => a.fav).forEach(a => { _favSet.add(a.artist); _favSet.add(a.title); });
+}
 function isFavSource(name) {
-  return S.artists.some(a => a.fav && a.name === name)
-    || S.labels.some(l => l.fav && l.name === name)
-    || S.albums.some(a => a.fav && (a.artist === name || a.title === name));
+  if (!_favSet) rebuildFavSet();
+  return _favSet.has(name);
 }
 
 function buildReleaseFilterPills() {
   const bar = document.getElementById('release-filter-bar');
-  const allRel = getAllReleases();
+  const allRel = getCachedAllReleases();
   const favCount = allRel.filter(r => isFavSource(r.artistName || r.labelName)).length;
   const sources = [...new Set(allRel.map(r => r.artistName || r.labelName))].sort();
   bar.innerHTML = `<button class="filter-pill ${releaseFilter==='all'?'active':''}" data-rfilter="all">Alle (${allRel.length})</button>` +
@@ -1090,7 +1095,7 @@ function buildReleaseFilterPills() {
 }
 
 function getFilteredReleases() {
-  let filtered = getAllReleases();
+  let filtered = getCachedAllReleases();
   if (releaseFilter === '_fav') filtered = filtered.filter(r => isFavSource(r.artistName || r.labelName));
   else if (releaseFilter === '_artists') filtered = filtered.filter(r => !r.fromLabel);
   else if (releaseFilter === '_labels') filtered = filtered.filter(r => r.fromLabel);
@@ -1102,10 +1107,14 @@ function getFilteredReleases() {
   return filtered;
 }
 
+let _cachedAllReleases = null;
+function getCachedAllReleases() { if (!_cachedAllReleases) _cachedAllReleases = getCachedAllReleases(); return _cachedAllReleases; }
+
 function renderReleases() {
+  _cachedAllReleases = null; // rebuild on each render
   const list=document.getElementById('releases-list'), empty=document.getElementById('releases-empty'), badge=document.getElementById('badge-r');
   document.getElementById('sync-info-r').textContent = sinceText(S.lastSync);
-  const allRelCount = getAllReleases().length;
+  const allRelCount = getCachedAllReleases().length;
   document.getElementById('release-total').textContent = allRelCount ? `${allRelCount} release(s)` : '';
   buildReleaseFilterPills();
   const filtered = getFilteredReleases();
@@ -1206,11 +1215,10 @@ function renderDeals() {
   empty.style.display = 'none';
   badge.textContent = filtered.length; badge.style.display = 'block';
 
-  // Use total_price when available (includes shipping), else price_eur
-  // For Discogs deals, add estimated shipping (€5) since price_eur excludes it
+  // Single-pass budget split
   const getEffectivePrice = d => d.total_price || (d.shop === 'Discogs' ? (d.price_eur||0) + 5 : d.price_eur || 0);
-  const budget = filtered.filter(d => getEffectivePrice(d) <= 25);
-  const other = filtered.filter(d => getEffectivePrice(d) > 25);
+  const budget = [], other = [];
+  for (const d of filtered) { (getEffectivePrice(d) <= 25 ? budget : other).push(d); }
 
   if (budget.length) {
     budgetSection.style.display = 'block';
@@ -1402,7 +1410,7 @@ async function syncLabels(newDeals) {
             await delay(DELAY);
             const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`);
             const median = st.median_price?.value || 0;
-            if (median && st.lowest_price?.value && st.lowest_price.value <= median * 0.70) {
+            if (median && st.lowest_price?.value && st.lowest_price.value <= median * DEAL_THRESHOLD) {
               newDeals.push({ artistName: rel.artist || label.name, title: rel.title, shop: 'Discogs', price_eur: st.lowest_price.value, discount_pct: Math.round((1 - st.lowest_price.value / median) * 100), medianPrice: median, url: `https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, thumb: rel.thumb || '', shipping_note: 'Zie Discogs marketplace', condition: '?', total_price: st.lowest_price.value, fromLabel: true });
             }
             // Also check backend shops for label releases
@@ -1533,11 +1541,12 @@ async function searchDealsFor(name, type) {
 (function() {
   const mainEl = document.getElementById('main-scroll');
   const ptr = document.getElementById('ptr-indicator');
-  let startY = 0, pulling = false;
+  let startY = 0, pulling = false, shouldRefresh = false;
 
   mainEl.addEventListener('touchstart', e => {
     if (mainEl.scrollTop === 0) startY = e.touches[0].clientY;
     else startY = 0;
+    shouldRefresh = false;
   }, { passive: true });
 
   mainEl.addEventListener('touchmove', e => {
@@ -1545,26 +1554,22 @@ async function searchDealsFor(name, type) {
     const diff = e.touches[0].clientY - startY;
     if (diff > 30 && mainEl.scrollTop === 0) {
       pulling = true;
+      shouldRefresh = diff > 80;
       ptr.classList.add('pulling');
-      ptr.textContent = diff > 80 ? '↻ Laat los om te vernieuwen' : '↓ Trek omlaag…';
+      ptr.textContent = shouldRefresh ? '↻ Laat los om te vernieuwen' : '↓ Trek omlaag…';
     }
   }, { passive: true });
 
   mainEl.addEventListener('touchend', () => {
-    if (pulling) {
-      const diff = parseInt(ptr.textContent.includes('Laat los') ? '81' : '0');
-      if (diff > 80 || ptr.textContent.includes('Laat los')) {
-        ptr.textContent = '↻ Vernieuwen…';
-        ptr.classList.remove('pulling');
-        ptr.classList.add('refreshing');
-        startSync().finally(() => {
-          ptr.classList.remove('refreshing');
-        });
-      } else {
-        ptr.classList.remove('pulling');
-      }
+    if (pulling && shouldRefresh) {
+      ptr.textContent = '↻ Vernieuwen…';
+      ptr.classList.remove('pulling');
+      ptr.classList.add('refreshing');
+      startSync().finally(() => ptr.classList.remove('refreshing'));
+    } else {
+      ptr.classList.remove('pulling');
     }
-    pulling = false; startY = 0;
+    pulling = false; startY = 0; shouldRefresh = false;
   });
 })();
 
