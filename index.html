@@ -163,6 +163,11 @@
     .theme-toggle { background: var(--surface); border: none; color: var(--muted); width: 34px; height: 34px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; flex-shrink: 0; }
     .theme-toggle:hover { background: var(--surface2); }
 
+    /* DEAL SLIDER */
+    .deal-slider { width: 100%; height: 4px; -webkit-appearance: none; appearance: none; background: var(--border); border-radius: 2px; outline: none; margin: 6px 0 2px; }
+    .deal-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+    .deal-slider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
+
     /* ADD BAR */
     .add-bar { display: flex; gap: 6px; margin-bottom: 8px; }
     .add-pill { flex: 1; background: none; border: 1.5px solid var(--accent); color: var(--accent); border-radius: 10px; padding: 8px 4px; font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center; }
@@ -301,6 +306,10 @@
               <button class="filter-pill" data-filter="shop" data-value="discogs">Discogs</button>
               <button class="filter-pill" data-filter="shop" data-value="shops">Webshops</button>
             </div>
+          </div>
+          <div class="filter-section" style="width:100%;margin-top:6px;">
+            <div class="filter-label">Min. korting: <strong id="discount-label">30%</strong></div>
+            <input type="range" id="discount-slider" min="0" max="60" value="30" step="5" class="deal-slider">
           </div>
           <div class="filter-section" style="width:100%;margin-top:4px;">
             <div class="filter-label">Min. conditie</div>
@@ -468,7 +477,7 @@
 const DISCOGS = 'https://api.discogs.com';
 const BACKEND = 'https://vinyl-backend-5scv.onrender.com';
 const DELAY = 700;
-const DEAL_THRESHOLD = 0.70;
+let DEAL_THRESHOLD = 1 - (parseInt(localStorage.getItem('vw_discount') || '30') / 100);
 
 const S = {
   token:      localStorage.getItem('vw_token') || '',
@@ -1248,6 +1257,12 @@ function filterDeals() {
     filtered = filtered.filter(d => (d.shop||'Discogs').toLowerCase() !== 'discogs');
   }
 
+  // Discount filter (slider)
+  const minPct = (1 - DEAL_THRESHOLD) * 100;
+  if (minPct > 0) {
+    filtered = filtered.filter(d => (d.discount_pct || 0) >= minPct);
+  }
+
   // Condition filter
   if (FILTERS.cond !== 'all') {
     const minRank = COND_RANK[FILTERS.cond] || 0;
@@ -1335,6 +1350,14 @@ document.getElementById('filter-bar').addEventListener('click', e => {
   FILTERS[type] = value;
   pill.parentElement.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
   pill.classList.add('active');
+  renderDeals();
+});
+
+document.getElementById('discount-slider').addEventListener('input', e => {
+  const pct = parseInt(e.target.value);
+  document.getElementById('discount-label').textContent = `${pct}%`;
+  DEAL_THRESHOLD = 1 - (pct / 100);
+  localStorage.setItem('vw_discount', pct);
   renderDeals();
 });
 
@@ -1604,7 +1627,8 @@ async function searchDealsFor(name, type) {
     listEl.innerHTML = results.map(r => {
       const price = r.total_price || r.price_eur || 0;
       const condLabel = r.condition && r.condition !== '?' ? ` · ${esc(r.condition)}` : '';
-      const isDeal = r.is_deal || r.discount_pct >= 30;
+      const minPct = (1 - DEAL_THRESHOLD) * 100;
+      const isDeal = r.discount_pct >= minPct;
       return `<a class="result-card${isDeal?' deal':''}" href="${r.url}" target="_blank" rel="noopener" style="margin-bottom:6px;">
         ${r.image_url?`<img class="result-thumb" src="${r.image_url}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
         <div class="result-info">
@@ -1715,7 +1739,10 @@ function tryAutoSync() {
 function showApp() {
   document.getElementById('setup-view').style.display='none';
   const m=document.getElementById('main-app'); m.style.display='flex';
-  renderVolgen(); renderReleases(); renderDeals();  updateThemeButtons();
+  const savedDiscount = localStorage.getItem('vw_discount') || '30';
+  document.getElementById('discount-slider').value = savedDiscount;
+  document.getElementById('discount-label').textContent = `${savedDiscount}%`;
+  renderVolgen(); renderReleases(); renderDeals(); updateThemeButtons();
   updateAutoSyncButtons();
   wakeBackend();
 
