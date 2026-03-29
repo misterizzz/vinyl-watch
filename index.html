@@ -778,7 +778,7 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
 
 async function startSync() {
   if (S.syncing) return;
-  const hasActive = S.artists.some(a => a.active !== false) || S.albums.length || S.labels.length;
+  const hasActive = S.artists.some(a => a.active !== false) || S.albums.some(a => a.active !== false) || S.labels.some(l => l.active !== false);
   if (!hasActive) { toast('Voeg eerst artiesten, albums of labels toe'); return; }
   S.syncing = true;
   const oldDealCount = S.deals.length;
@@ -792,7 +792,8 @@ async function startSync() {
 
   const yr = new Date().getFullYear();
   const activeCount = S.artists.filter(a => a.active !== false).length;
-  const totalSteps = activeCount + S.albums.length;
+  const activeAlbumCount = S.albums.filter(a => a.active !== false).length;
+  const totalSteps = activeCount + activeAlbumCount;
   let step = 0;
 
   // Parallel artist sync: batches of 3 (skip inactive)
@@ -804,9 +805,10 @@ async function startSync() {
     step += batch.length;
   }
 
-  // Sync followed albums (parallel batches of 3)
-  for (let i = 0; i < S.albums.length; i += 3) {
-    const batch = S.albums.slice(i, i + 3);
+  // Sync followed albums (parallel batches of 3, skip inactive)
+  const activeAlbums = S.albums.filter(a => a.active !== false);
+  for (let i = 0; i < activeAlbums.length; i += 3) {
+    const batch = activeAlbums.slice(i, i + 3);
     step += batch.length;
     label.textContent = `${step}/${totalSteps} ${batch.map(a=>(a.title||'').slice(0,8)).join(', ')}`;
     await Promise.all(batch.map(async album => {
@@ -970,54 +972,50 @@ function renderVolgen() {
     return;
   }
 
+  const showType = volgenFilter === 'all' || volgenFilter === 'favorites';
   list.innerHTML = items.map(item => {
-    if (item._type === 'artist') {
-      const isActive = item.active !== false;
-      return `<div class="artist-card ${isActive?'':'inactive'}" data-id="${item.id}" data-type="artist">
-        <button class="fav-btn ${item.fav?'on':''}" data-id="${item.id}" data-type="artist">★</button>
+    const isActive = item.active !== false;
+    const id = item._type === 'album' ? item.releaseId : item.id;
+    const typeBadge = showType ? `<span class="type-badge ${item._type}">${item._type === 'artist' ? 'artiest' : item._type}</span> ` : '';
+
+    if (item._type === 'album') {
+      return `<div class="artist-card ${isActive?'':'inactive'}">
+        <button class="fav-btn ${item.fav?'on':''}" data-id="${id}" data-type="album">★</button>
+        ${item.thumb?`<img src="${item.thumb}" style="width:36px;height:36px;border-radius:6px;flex-shrink:0;" loading="lazy">`:''}
         <div style="min-width:0;flex:1;">
-          <div class="artist-name"><span class="type-badge artist">artiest</span> ${esc(item.name)}</div>
-          <div class="artist-meta">Discogs ID ${item.id}</div>
+          <div class="artist-name">${typeBadge}${esc(item.title)}</div>
+          <div class="artist-meta">${esc(item.artist)}${item.year?' · '+item.year:''}</div>
         </div>
         <div class="card-actions">
-          <button class="toggle-btn ${isActive?'':'off'}" data-id="${item.id}" title="${isActive?'Deselecteer':'Selecteer'}">${isActive?'✓':'—'}</button>
-          <button class="search-deals-btn" data-name="${esc(item.name)}" data-type="artist">🔍</button>
-          <button class="remove-btn" data-id="${item.id}" data-type="artist">×</button>
-        </div>
-      </div>`;
-    } else if (item._type === 'label') {
-      return `<div class="artist-card" data-id="${item.id}" data-type="label">
-        <button class="fav-btn ${item.fav?'on':''}" data-id="${item.id}" data-type="label">★</button>
-        <div style="min-width:0;flex:1;">
-          <div class="artist-name"><span class="type-badge label">label</span> ${esc(item.name)}</div>
-          <div class="artist-meta">Discogs ID ${item.id}</div>
-        </div>
-        <div class="card-actions">
-          <button class="search-deals-btn" data-name="${esc(item.name)}" data-type="label">🔍</button>
-          <button class="remove-btn" data-id="${item.id}" data-type="label">×</button>
-        </div>
-      </div>`;
-    } else {
-      return `<div class="artist-card" data-id="${item.releaseId}" data-type="album">
-        <button class="fav-btn ${item.fav?'on':''}" data-id="${item.releaseId}" data-type="album">★</button>
-        <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
-          ${item.thumb?`<img src="${item.thumb}" style="width:36px;height:36px;border-radius:3px;flex-shrink:0;" loading="lazy">`:''}
-          <div style="min-width:0;">
-            <div class="artist-name"><span class="type-badge album">album</span> ${esc(item.title)}</div>
-            <div class="artist-meta">${esc(item.artist)}${item.year?' · '+item.year:''}</div>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button class="search-deals-btn" data-name="${esc(item.artist)}" data-title="${esc(item.title)}" data-relid="${item.releaseId}" data-type="album">💰 Top 5</button>
-          <button class="remove-btn" data-id="${item.releaseId}" data-type="album">×</button>
+          <button class="toggle-btn ${isActive?'':'off'}" data-id="${id}" data-type="album">${isActive?'✓':'—'}</button>
+          <button class="search-deals-btn" data-name="${esc(item.artist)}" data-title="${esc(item.title)}" data-relid="${id}" data-type="album">💰</button>
+          <button class="remove-btn" data-id="${id}" data-type="album">×</button>
         </div>
       </div>`;
     }
+
+    return `<div class="artist-card ${isActive?'':'inactive'}">
+      <button class="fav-btn ${item.fav?'on':''}" data-id="${id}" data-type="${item._type}">★</button>
+      <div style="min-width:0;flex:1;">
+        <div class="artist-name">${typeBadge}${esc(item._name)}</div>
+        <div class="artist-meta">Discogs ${item.id}</div>
+      </div>
+      <div class="card-actions">
+        <button class="toggle-btn ${isActive?'':'off'}" data-id="${id}" data-type="${item._type}">${isActive?'✓':'—'}</button>
+        <button class="search-deals-btn" data-name="${esc(item._name)}" data-type="${item._type}">🔍</button>
+        <button class="remove-btn" data-id="${id}" data-type="${item._type}">×</button>
+      </div>
+    </div>`;
   }).join('');
 
   // Event listeners
   list.querySelectorAll('.fav-btn').forEach(btn => btn.addEventListener('click', () => toggleFavorite(btn.dataset.type, parseInt(btn.dataset.id))));
-  list.querySelectorAll('.toggle-btn').forEach(btn => btn.addEventListener('click', () => toggleArtistActive(parseInt(btn.dataset.id))));
+  list.querySelectorAll('.toggle-btn').forEach(btn => btn.addEventListener('click', () => {
+    const type = btn.dataset.type;
+    const id = parseInt(btn.dataset.id);
+    if (type === 'artist') toggleArtistActive(id);
+    else { const arr = type === 'label' ? S.labels : S.albums; const item = arr.find(x => (x.releaseId||x.id) === id); if (item) { item.active = !(item.active !== false); save(); renderVolgen(); } }
+  }));
   list.querySelectorAll('.remove-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = parseInt(btn.dataset.id);
@@ -1360,10 +1358,11 @@ function removeLabel(id) {
   save(); renderVolgen();}
 
 async function syncLabels(newDeals) {
-  if (!S.labels.length) return;
+  const activeLabels = S.labels.filter(l => l.active !== false);
+  if (!activeLabels.length) return;
   const yr = new Date().getFullYear();
   const newLabelReleases = [];
-  for (const label of S.labels) {
+  for (const label of activeLabels) {
     try {
       const data = await discogsGet(`/labels/${label.id}/releases?sort=year&sort_order=desc&per_page=50`);
       await delay(DELAY);
