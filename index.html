@@ -15,14 +15,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
+    :root, [data-theme="dark"] {
       --bg: #0f0d0a; --surface: #1c1914; --surface2: #252019; --border: #302820;
       --red: #c5341a; --gold: #c9a227; --gold-dim: #7a6020;
       --text: #f0e6d3; --muted: #8a7c6a; --green: #4a9e6a;
+      --overlay-bg: rgba(0,0,0,0.7);
       --font-display: 'Playfair Display', Georgia, serif;
       --font-mono: 'Courier Prime', 'Courier New', monospace;
       --safe-top: env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    [data-theme="light"] {
+      --bg: #f5f0e8; --surface: #ffffff; --surface2: #ede7db; --border: #d4c9b8;
+      --red: #b02e18; --gold: #9a7a15; --gold-dim: #c4a84a;
+      --text: #1c1914; --muted: #6b5f50; --green: #357a50;
+      --overlay-bg: rgba(0,0,0,0.4);
     }
     html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 15px; line-height: 1.5; overflow: hidden; }
     #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; }
@@ -95,7 +102,7 @@
     .price-now { font-size: 14px; font-weight: 700; color: var(--green); }
     .price-was { font-size: 11px; color: var(--muted); text-decoration: line-through; }
     .price-pct { font-size: 11px; color: var(--green); }
-    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: flex-end; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    .overlay { position: fixed; inset: 0; background: var(--overlay-bg); display: flex; align-items: flex-end; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
     .overlay.open { opacity: 1; pointer-events: all; }
     .sheet { background: var(--surface); border-radius: 16px 16px 0 0; border: 1px solid var(--border); border-bottom: none; width: 100%; max-width: 480px; margin: 0 auto; padding: 20px 16px calc(var(--safe-bottom) + 20px); transform: translateY(100%); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1); max-height: 85vh; display: flex; flex-direction: column; gap: 11px; }
     .overlay.open .sheet { transform: none; }
@@ -131,6 +138,10 @@
     .filter-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
     .subsection-title { font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--green); margin: 16px 0 8px; display: flex; align-items: center; gap: 6px; }
     .subsection-title .count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-weight: 400; }
+
+    /* THEME TOGGLE */
+    .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; flex-shrink: 0; }
+    .theme-toggle:hover { border-color: var(--gold); color: var(--gold); }
   </style>
 </head>
 <body>
@@ -140,12 +151,12 @@
   <div id="setup-view">
     <div class="setup-logo">Vinyl<em>Watch</em></div>
     <svg class="record-art" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="60" cy="60" r="58" fill="#1c1914" stroke="#c9a227" stroke-width="1.5"/>
-      <circle cx="60" cy="60" r="44" fill="#0f0d0a" stroke="#302820" stroke-width="0.5"/>
-      <circle cx="60" cy="60" r="30" fill="#1c1914" stroke="#302820" stroke-width="0.5"/>
-      <circle cx="60" cy="60" r="18" fill="#0f0d0a" stroke="#c5341a" stroke-width="1"/>
-      <circle cx="60" cy="60" r="5" fill="#c9a227"/>
-      <circle cx="60" cy="60" r="2" fill="#0f0d0a"/>
+      <circle cx="60" cy="60" r="58" fill="var(--surface)" stroke="var(--gold)" stroke-width="1.5"/>
+      <circle cx="60" cy="60" r="44" fill="var(--bg)" stroke="var(--border)" stroke-width="0.5"/>
+      <circle cx="60" cy="60" r="30" fill="var(--surface)" stroke="var(--border)" stroke-width="0.5"/>
+      <circle cx="60" cy="60" r="18" fill="var(--bg)" stroke="var(--red)" stroke-width="1"/>
+      <circle cx="60" cy="60" r="5" fill="var(--gold)"/>
+      <circle cx="60" cy="60" r="2" fill="var(--bg)"/>
     </svg>
 
     <div class="setup-card">
@@ -180,10 +191,13 @@
   <div id="main-app" style="display:none; flex-direction:column; height:100%;">
     <header>
       <div class="logo">Vinyl<span>Watch</span></div>
-      <button class="sync-btn" id="sync-btn">
-        <span class="spin-icon">↻</span>
-        <span id="sync-label">Vernieuwen</span>
-      </button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="theme-toggle" id="theme-toggle" title="Wissel thema">☀️</button>
+        <button class="sync-btn" id="sync-btn">
+          <span class="spin-icon">↻</span>
+          <span id="sync-label">Vernieuwen</span>
+        </button>
+      </div>
     </header>
 
     <main>
@@ -287,6 +301,14 @@
       <div class="view" id="view-settings">
         <div class="section-title" style="margin-bottom:14px;">Instellingen</div>
         <div class="setup-card" style="margin-bottom:10px;">
+          <h2>Thema</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn sm" id="theme-dark-btn">Donker</button>
+            <button class="btn sm secondary" id="theme-light-btn">Licht</button>
+            <button class="btn sm secondary" id="theme-auto-btn">Systeem</button>
+          </div>
+        </div>
+        <div class="setup-card" style="margin-bottom:10px;">
           <h2>Backend URL</h2>
           <input type="url" id="settings-backend-url" placeholder="https://vinyl-backend-xxxx.onrender.com">
           <button class="btn sm" id="save-backend-btn" style="margin-top:4px;">Opslaan</button>
@@ -295,6 +317,19 @@
           <h2>Discogs token</h2>
           <input type="password" id="settings-token" placeholder="••••••••••••">
           <button class="btn sm" id="save-token-btn" style="margin-top:4px;">Opslaan</button>
+        </div>
+        <div class="setup-card" style="margin-bottom:10px;">
+          <h2>Data exporteren</h2>
+          <p style="font-size:13px;color:var(--muted);">Download al je artiesten, albums, labels en deals als JSON backup.</p>
+          <button class="btn sm secondary" id="export-data-btn" style="margin-top:4px;">Exporteer JSON</button>
+        </div>
+        <div class="setup-card" style="margin-bottom:10px;">
+          <h2>Data importeren</h2>
+          <p style="font-size:13px;color:var(--muted);">Herstel vanuit een eerder gedownloade JSON backup.</p>
+          <label class="btn sm secondary" style="margin-top:4px;display:inline-block;text-align:center;cursor:pointer;">
+            Importeer JSON
+            <input type="file" id="import-data-input" accept=".json" style="display:none;">
+          </label>
         </div>
         <div class="setup-card">
           <h2>Data wissen</h2>
@@ -479,6 +514,31 @@ async function wakeBackend() {
   try { await fetch(`${S.backendUrl}/ping`); } catch (_) {}
 }
 
+// ── THEME ─────────────────────────────────────
+function getSystemTheme() { return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+
+function applyTheme(theme) {
+  const resolved = theme === 'auto' ? getSystemTheme() : theme;
+  document.documentElement.setAttribute('data-theme', resolved);
+  document.getElementById('theme-toggle').textContent = resolved === 'light' ? '🌙' : '☀️';
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.content = resolved === 'light' ? '#f5f0e8' : '#0f0d0a';
+}
+
+const savedTheme = localStorage.getItem('vw_theme') || 'dark';
+applyTheme(savedTheme);
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const current = localStorage.getItem('vw_theme') || 'dark';
+  const next = (current === 'dark' || current === 'auto' && getSystemTheme() === 'dark') ? 'light' : 'dark';
+  localStorage.setItem('vw_theme', next);
+  applyTheme(next);
+});
+
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+  if ((localStorage.getItem('vw_theme') || 'dark') === 'auto') applyTheme('auto');
+});
+
 // ── SETUP ──────────────────────────────────────
 document.getElementById('test-backend-btn').addEventListener('click', async () => {
   const url = document.getElementById('backend-url-input').value.trim().replace(/\/$/, '');
@@ -653,7 +713,8 @@ document.getElementById('sync-btn').addEventListener('click', startSync);
 async function startSync() {
   if (S.syncing) return;
   if (!S.artists.length && !S.albums.length) { toast('Voeg eerst artiesten of albums toe'); return; }
-  S.syncing = true; S.releases = []; S.deals = [];
+  S.syncing = true;
+  const newReleases = [], newDeals = [];
   const btn = document.getElementById('sync-btn');
   const label = document.getElementById('sync-label');
   btn.disabled = true; btn.classList.add('spinning');
@@ -668,7 +729,7 @@ async function startSync() {
   for (let i = 0; i < S.artists.length; i++) {
     const artist = S.artists[i];
     step++;
-    label.textContent = `${step}/${totalSteps}`;
+    label.textContent = `${step}/${totalSteps} ${artist.name.slice(0,12)}`;
     try {
       const data = await discogsGet(`/artists/${artist.id}/releases?sort=year&sort_order=desc&per_page=50`);
       await delay(DELAY);
@@ -684,9 +745,9 @@ async function startSync() {
           let median = 0;
           try { await delay(DELAY); const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`); median = st.median_price?.value||0; medianPrice=median; } catch(_){}
           const obj = { id:rel.id, artistId:artist.id, artistName:artist.name, title:det.title, year:det.year, thumb:det.thumb||det.images?.[0]?.resource_url||'', uri:`https://www.discogs.com/release/${rel.id}`, lowestPrice:det.lowest_price||0, medianPrice:median, numForSale:det.num_for_sale||0 };
-          S.releases.push(obj);
+          newReleases.push(obj);
           if (median && det.lowest_price && det.lowest_price <= median*0.70) {
-            S.deals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace', condition:'?' });
+            newDeals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace', condition:'?' });
           }
         } catch(_){}
       }
@@ -696,7 +757,7 @@ async function startSync() {
         try {
           const shopResults = await backendSearch(artist.name, '', medianPrice);
           shopResults.filter(r=>r.is_deal).forEach(d => {
-            S.deals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur });
+            newDeals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur });
           });
         } catch(e){ console.warn(`Backend fout ${artist.name}:`, e.message); }
       }
@@ -706,7 +767,7 @@ async function startSync() {
   // Sync followed albums
   for (const album of S.albums) {
     step++;
-    label.textContent = `${step}/${totalSteps}`;
+    label.textContent = `${step}/${totalSteps} ${(album.title||'').slice(0,12)}`;
     try {
       let median = album.medianPrice || 0;
       if (album.releaseId) {
@@ -715,7 +776,7 @@ async function startSync() {
           const st = await discogsGet(`/marketplace/stats/${album.releaseId}?curr_abbr=EUR`);
           median = st.median_price?.value || 0;
           if (median && st.lowest_price?.value && st.lowest_price.value <= median*0.70) {
-            S.deals.push({ artistName:album.artist, title:album.title, shop:'Discogs', price_eur:st.lowest_price.value, discount_pct:Math.round((1-st.lowest_price.value/median)*100), medianPrice:median, url:`https://www.discogs.com/sell/list?release_id=${album.releaseId}&sort=price%2Casc`, thumb:album.thumb, shipping_note:'Zie Discogs marketplace', condition:'?', total_price:st.lowest_price.value, fromAlbum:true });
+            newDeals.push({ artistName:album.artist, title:album.title, shop:'Discogs', price_eur:st.lowest_price.value, discount_pct:Math.round((1-st.lowest_price.value/median)*100), medianPrice:median, url:`https://www.discogs.com/sell/list?release_id=${album.releaseId}&sort=price%2Casc`, thumb:album.thumb, shipping_note:'Zie Discogs marketplace', condition:'?', total_price:st.lowest_price.value, fromAlbum:true });
           }
         } catch(_){}
       }
@@ -723,7 +784,7 @@ async function startSync() {
         try {
           const shopResults = await backendSearch(album.artist, album.title, median);
           shopResults.forEach(d => {
-            S.deals.push({ artistName:album.artist, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct||0, medianPrice:median, url:d.url, thumb:d.image_url||album.thumb, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur, fromAlbum:true });
+            newDeals.push({ artistName:album.artist, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct||0, medianPrice:median, url:d.url, thumb:d.image_url||album.thumb, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur, fromAlbum:true });
           });
         } catch(e){ console.warn(`Album backend fout ${album.title}:`, e.message); }
       }
@@ -731,8 +792,11 @@ async function startSync() {
   }
 
   await syncLabels();
-  S.releases.sort((a,b)=>(b.year||0)-(a.year||0));
-  S.deals.sort((a,b)=>(b.discount_pct||0)-(a.discount_pct||0));
+  // Atomic update: only replace data after successful sync
+  newReleases.sort((a,b)=>(b.year||0)-(a.year||0));
+  newDeals.sort((a,b)=>(b.discount_pct||0)-(a.discount_pct||0));
+  S.releases = newReleases;
+  S.deals = newDeals;
   S.lastSync = new Date().toISOString();
   save();
   document.getElementById('wake-r').classList.remove('show');
@@ -756,6 +820,49 @@ document.getElementById('clear-data-btn').addEventListener('click', () => {
   S.artists=[]; S.releases=[]; S.deals=[]; S.lastSync=null; S.albums=[]; S.labels=[]; S.labelReleases=[];
   ['vw_artists','vw_releases','vw_deals','vw_labels','vw_label_releases','vw_albums','vw_last_sync'].forEach(k=>localStorage.removeItem(k));
   renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases(); toast('Data gewist');
+});
+
+// Theme settings buttons
+function setTheme(t) { localStorage.setItem('vw_theme', t); applyTheme(t); toast(`Thema: ${t==='dark'?'donker':t==='light'?'licht':'systeem'}`); updateThemeButtons(); }
+function updateThemeButtons() {
+  const t = localStorage.getItem('vw_theme') || 'dark';
+  ['dark','light','auto'].forEach(v => {
+    const btn = document.getElementById(`theme-${v}-btn`);
+    if (btn) { btn.className = t === v ? 'btn sm' : 'btn sm secondary'; }
+  });
+}
+document.getElementById('theme-dark-btn').addEventListener('click', () => setTheme('dark'));
+document.getElementById('theme-light-btn').addEventListener('click', () => setTheme('light'));
+document.getElementById('theme-auto-btn').addEventListener('click', () => setTheme('auto'));
+
+// Data export
+document.getElementById('export-data-btn').addEventListener('click', () => {
+  const data = { artists: S.artists, albums: S.albums, labels: S.labels, releases: S.releases, deals: S.deals, labelReleases: S.labelReleases, lastSync: S.lastSync, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `vinylwatch-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Backup gedownload');
+});
+
+// Data import
+document.getElementById('import-data-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data.artists && !data.albums && !data.labels) { toast('Ongeldig backup bestand'); return; }
+    if (!confirm(`Importeren: ${(data.artists||[]).length} artiesten, ${(data.albums||[]).length} albums, ${(data.labels||[]).length} labels. Huidige data wordt overschreven.`)) return;
+    S.artists = data.artists || []; S.albums = data.albums || []; S.labels = data.labels || [];
+    S.releases = data.releases || []; S.deals = data.deals || [];
+    S.labelReleases = data.labelReleases || []; S.lastSync = data.lastSync || null;
+    save();
+    renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases();
+    toast(`Backup hersteld!`);
+  } catch (err) { toast(`Import fout: ${err.message}`); }
+  e.target.value = '';
 });
 
 // ── RENDER ────────────────────────────────────
@@ -1103,6 +1210,7 @@ function showApp() {
   const m=document.getElementById('main-app'); m.style.display='flex';
   document.getElementById('settings-backend-url').value = S.backendUrl;
   renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases();
+  updateThemeButtons();
   wakeBackend();
 }
 
