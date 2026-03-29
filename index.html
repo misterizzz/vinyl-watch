@@ -369,22 +369,13 @@
           <button class="btn sm" id="save-token-btn" style="margin-top:4px;">Opslaan</button>
         </div>
         <div class="setup-card" style="margin-bottom:10px;">
-          <h2>Data exporteren</h2>
-          <p style="font-size:13px;color:var(--muted);">Download al je artiesten, albums, labels en deals als JSON backup.</p>
-          <button class="btn sm secondary" id="export-data-btn" style="margin-top:4px;">Exporteer JSON</button>
-        </div>
-        <div class="setup-card" style="margin-bottom:10px;">
-          <h2>Data importeren</h2>
-          <p style="font-size:13px;color:var(--muted);">Herstel vanuit een eerder gedownloade JSON backup.</p>
-          <label class="btn sm secondary" style="margin-top:4px;display:inline-block;text-align:center;cursor:pointer;">
-            Importeer JSON
-            <input type="file" id="import-data-input" accept=".json" style="display:none;">
-          </label>
-        </div>
-        <div class="setup-card" style="margin-bottom:10px;">
-          <h2>Apple Music importeren</h2>
-          <p style="font-size:13px;color:var(--muted);">Importeer artiesten uit je Apple Music bibliotheek XML.</p>
-          <button class="btn sm secondary" id="xml-import-btn" style="margin-top:4px;">XML importeren</button>
+          <h2>Muziek importeren</h2>
+          <p style="font-size:13px;color:var(--muted);">Importeer artiesten uit je muziekbibliotheek.</p>
+          <div style="display:flex;gap:8px;margin-top:4px;">
+            <button class="btn sm secondary" id="xml-import-btn">Apple Music XML</button>
+            <button class="btn sm secondary" id="csv-import-btn">Spotify CSV</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:6px;">Spotify: gebruik <a href="https://exportify.net" target="_blank" rel="noopener" style="color:var(--accent);">exportify.net</a> om een CSV te maken.</p>
         </div>
         <div class="setup-card">
           <h2>Data wissen</h2>
@@ -434,6 +425,24 @@
   </div>
 </div>
 
+
+<!-- SPOTIFY CSV OVERLAY -->
+<div class="overlay" id="csv-overlay">
+  <div class="sheet">
+    <div class="sheet-title">Spotify CSV importeren</div>
+    <p style="font-size:13px;color:var(--muted);">
+      Ga naar <a href="https://exportify.net" target="_blank" rel="noopener" style="color:var(--accent);">exportify.net</a> →<br>
+      Log in met Spotify → klik <strong>Export</strong> bij een playlist of je hele bibliotheek.<br>
+      Upload het CSV-bestand hieronder.
+    </p>
+    <label class="upload-zone" id="csv-upload-zone">
+      <input type="file" id="csv-file-input" accept=".csv">
+      📂 Tik of sleep een CSV hiernaartoe
+    </label>
+    <div id="csv-status" style="font-size:12px;color:var(--muted);min-height:18px;"></div>
+    <button class="btn secondary" id="close-csv">Sluiten</button>
+  </div>
+</div>
 
 <!-- LABEL SEARCH OVERLAY -->
 <div class="overlay" id="label-overlay">
@@ -675,6 +684,80 @@ zone.addEventListener('drop', e => {
   if (f) { const dt = new DataTransfer(); dt.items.add(f); const inp = document.getElementById('xml-file-input'); inp.files = dt.files; inp.dispatchEvent(new Event('change')); }
 });
 
+// ── SPOTIFY CSV IMPORT ───────────────────────
+document.getElementById('csv-import-btn').addEventListener('click', () => document.getElementById('csv-overlay').classList.add('open'));
+document.getElementById('close-csv').addEventListener('click', () => document.getElementById('csv-overlay').classList.remove('open'));
+
+document.getElementById('csv-file-input').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('csv-status');
+  statusEl.textContent = '⏳ CSV inlezen…';
+
+  try {
+    const text = await file.text();
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) { statusEl.innerHTML = '<span class="error-msg">Leeg CSV bestand.</span>'; return; }
+
+    // Find Artist column (Exportify uses "Artist Name(s)", some use "Artist")
+    const header = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
+    const artistCol = header.findIndex(h => h.includes('artist'));
+    if (artistCol === -1) { statusEl.innerHTML = '<span class="error-msg">Geen "Artist" kolom gevonden in CSV.</span>'; return; }
+
+    // Parse CSV rows (handle quoted fields with commas)
+    function parseCSVRow(row) {
+      const fields = []; let field = '', inQuotes = false;
+      for (const ch of row) {
+        if (ch === '"') { inQuotes = !inQuotes; }
+        else if (ch === ',' && !inQuotes) { fields.push(field.trim()); field = ''; }
+        else { field += ch; }
+      }
+      fields.push(field.trim());
+      return fields;
+    }
+
+    const artistSet = new Set();
+    for (let i = 1; i < lines.length; i++) {
+      const fields = parseCSVRow(lines[i]);
+      const artist = (fields[artistCol] || '').replace(/^"|"$/g, '').trim();
+      if (artist) artistSet.add(artist);
+    }
+
+    if (!artistSet.size) { statusEl.innerHTML = '<span class="error-msg">Geen artiesten gevonden in CSV.</span>'; return; }
+
+    statusEl.textContent = `📦 ${artistSet.size} artiesten gevonden. Discogs ID's ophalen…`;
+    let added = 0, i = 0;
+
+    for (const name of artistSet) {
+      i++;
+      if (S.artists.some(a => a.name.toLowerCase() === name.toLowerCase())) continue;
+      try {
+        statusEl.textContent = `🔍 ${i}/${artistSet.size}: ${name}`;
+        const d = await discogsGet(`/database/search?q=${encodeURIComponent(name)}&type=artist&per_page=1`);
+        const r = d.results?.[0];
+        if (r) { S.artists.push({ id: r.id, name, addedAt: new Date().toISOString() }); added++; }
+        await delay(DELAY);
+      } catch (_) {}
+    }
+
+    save();
+    renderVolgen();
+    statusEl.innerHTML = `<span class="success-msg">✅ ${added} artiesten geïmporteerd!</span>`;
+    setTimeout(() => document.getElementById('csv-overlay').classList.remove('open'), 2000);
+  } catch (err) {
+    statusEl.innerHTML = `<span class="error-msg">Fout: ${esc(err.message)}</span>`;
+  }
+});
+
+const csvZone = document.getElementById('csv-upload-zone');
+csvZone.addEventListener('dragover', e => { e.preventDefault(); csvZone.classList.add('drag'); });
+csvZone.addEventListener('dragleave', () => csvZone.classList.remove('drag'));
+csvZone.addEventListener('drop', e => {
+  e.preventDefault(); csvZone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) { const dt = new DataTransfer(); dt.items.add(f); const inp = document.getElementById('csv-file-input'); inp.files = dt.files; inp.dispatchEvent(new Event('change')); }
+});
+
 // ── ARTIST SEARCH ──────────────────────────────
 document.getElementById('search-artist-btn').addEventListener('click', () => {
   document.getElementById('search-overlay').classList.add('open');
@@ -877,35 +960,6 @@ function updateThemeButtons() {
 document.getElementById('theme-dark-btn').addEventListener('click', () => setTheme('dark'));
 document.getElementById('theme-light-btn').addEventListener('click', () => setTheme('light'));
 document.getElementById('theme-auto-btn').addEventListener('click', () => setTheme('auto'));
-
-// Data export
-document.getElementById('export-data-btn').addEventListener('click', () => {
-  const data = { artists: S.artists, albums: S.albums, labels: S.labels, releases: S.releases, deals: S.deals, labelReleases: S.labelReleases, lastSync: S.lastSync, exportedAt: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `vinylwatch-backup-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  toast('Backup gedownload');
-});
-
-// Data import
-document.getElementById('import-data-input').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  try {
-    const data = JSON.parse(await file.text());
-    if (!data.artists && !data.albums && !data.labels) { toast('Ongeldig backup bestand'); return; }
-    if (!confirm(`Importeren: ${(data.artists||[]).length} artiesten, ${(data.albums||[]).length} albums, ${(data.labels||[]).length} labels. Huidige data wordt overschreven.`)) return;
-    S.artists = data.artists || []; S.albums = data.albums || []; S.labels = data.labels || [];
-    S.releases = data.releases || []; S.deals = data.deals || [];
-    S.labelReleases = data.labelReleases || []; S.lastSync = data.lastSync || null;
-    save();
-    renderVolgen(); renderReleases(); renderDeals();    toast(`Backup hersteld!`);
-  } catch (err) { toast(`Import fout: ${err.message}`); }
-  e.target.value = '';
-});
 
 // ── RENDER ────────────────────────────────────
 let volgenFilter = 'all';
