@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stijl A — Warm Vinyl (verfijnd)</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0c0a07;--surface:#171310;--surface2:#1f1b16;--border:#2a2520;
+    --accent:#d4a32a;--accent-dim:#6b5215;--red:#c0392b;
+    --text:#e8dcc8;--muted:#7a6e5e;--green:#2ecc71;
+    --font-display:'DM Serif Display',Georgia,serif;
+    --font-body:'IBM Plex Mono','Courier New',monospace;
+  }
+  body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.5;max-width:420px;margin:0 auto;min-height:100vh}
+
+  header{padding:18px 16px 14px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .logo{font-family:var(--font-display);font-size:24px;letter-spacing:-0.5px}.logo span{color:var(--red)}
+  .sync-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:20px;font-family:var(--font-body);font-size:11px;cursor:pointer}
+
+  .label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:16px 16px 8px}
+
+  .pills{display:flex;gap:6px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+  .pills::-webkit-scrollbar{display:none}
+  .pill{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:11px;color:var(--muted);white-space:nowrap;cursor:pointer;font-family:var(--font-body)}
+  .pill.on{border-color:var(--accent);color:var(--accent);background:var(--surface2)}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin:6px 16px;display:flex;gap:10px;align-items:center}
+  .card.deal{border-left:3px solid var(--green)}
+  .thumb{width:48px;height:48px;border-radius:6px;background:var(--surface2);flex-shrink:0}
+  .info{flex:1;min-width:0}
+  .title{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .artist{font-size:12px;color:var(--accent);margin:2px 0}
+  .meta{font-size:11px;color:var(--muted)}
+  .badge{background:var(--green);color:white;font-size:9px;font-weight:600;padding:2px 7px;border-radius:10px;display:inline-block;margin-top:3px}
+  .price{text-align:right;flex-shrink:0}
+  .price-now{font-size:15px;font-weight:600;color:var(--green)}
+  .price-was{font-size:10px;color:var(--muted);text-decoration:line-through}
+
+  .actions{display:flex;gap:5px;padding:0 16px;margin:10px 0}
+  .act{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;flex:1;text-align:center;cursor:pointer;font-family:var(--font-body)}
+  .act .icon{font-size:20px;margin-bottom:4px}
+  .act .name{font-size:11px;font-weight:600}
+  .act .desc{font-size:10px;color:var(--muted)}
+
+  .item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:5px 16px;display:flex;align-items:center;gap:8px}
+  .fav{font-size:14px;opacity:.25;cursor:pointer;flex-shrink:0}.fav.on{opacity:1}
+  .item .name{font-weight:600;font-size:12px;flex:1}
+  .type{font-size:8px;font-weight:600;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.3px}
+  .type.a{background:var(--accent-dim);color:white}
+  .type.l{background:var(--red);color:white}
+  .type.al{background:var(--green);color:white}
+  .btns{display:flex;gap:4px}
+  .btn-sm{background:none;border:1px solid var(--border);color:var(--muted);padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-family:var(--font-body)}
+
+  nav{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--border);padding:8px 0;position:fixed;bottom:0;left:0;right:0;max-width:420px;margin:0 auto}
+  .nav-btn{background:none;border:none;color:var(--muted);font-family:var(--font-body);font-size:9px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px;cursor:pointer}
+  .nav-btn .ni{font-size:18px}
+  .nav-btn.on{color:var(--accent)}
+
+  .section{padding:20px 0}
+  h2{font-family:var(--font-display);font-size:17px;padding:0 16px;margin-bottom:4px}
+  .hint{font-size:18px;text-align:center;padding:40px;color:var(--muted)}
+  .preview-tag{position:fixed;top:0;left:0;right:0;background:var(--accent);color:var(--bg);text-align:center;font-size:11px;font-weight:600;padding:4px;z-index:99;font-family:var(--font-body)}
+</style>
+</head>
+<body>
+<div class="preview-tag">STIJL A — Warm Vinyl (verfijnd huidig thema, andere fonts)</div>
+
+<header style="margin-top:28px">
+  <div class="logo">Vinyl<span>Watch</span></div>
+  <button class="sync-btn">↻ Vernieuwen</button>
+</header>
+
+<div class="section">
+  <div class="actions">
+    <div class="act"><div class="icon">🎵</div><div class="name">XML</div><div class="desc">Apple Music</div></div>
+    <div class="act"><div class="icon">🔍</div><div class="name">Artiest</div><div class="desc">Toevoegen</div></div>
+    <div class="act"><div class="icon">🏷</div><div class="name">Label</div><div class="desc">Toevoegen</div></div>
+  </div>
+
+  <div class="pills" style="margin-bottom:10px">
+    <div class="pill on">Alle</div>
+    <div class="pill">★ Favorieten</div>
+    <div class="pill">Artiesten</div>
+    <div class="pill">Labels</div>
+    <div class="pill">Albums</div>
+  </div>
+
+  <div class="item">
+    <span class="fav on">★</span>
+    <span class="type a">artiest</span>
+    <span class="name">Miles Davis</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm" style="color:var(--green)">✓</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item" style="opacity:.45">
+    <span class="fav">★</span>
+    <span class="type a">artiest</span>
+    <span class="name">John Coltrane</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm">—</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item">
+    <span class="fav on">★</span>
+    <span class="type l">label</span>
+    <span class="name">Blue Note</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item">
+    <span class="fav">★</span>
+    <span class="type al">album</span>
+    <span class="name">Kind of Blue</span>
+    <div class="btns"><button class="btn-sm">💰 Top 5</button><button class="btn-sm">×</button></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Aanbiedingen</h2>
+  <div class="label">BUDGET DEALS ≤€25</div>
+
+  <div class="card deal">
+    <div class="thumb" style="background:#1a1a1a"></div>
+    <div class="info">
+      <div class="title">Kind of Blue (180g)</div>
+      <div class="artist">Miles Davis</div>
+      <div class="meta">JPC.de · Nieuw · Verz. vanuit Duitsland</div>
+      <span class="badge">−42% deal</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€18.99</div>
+      <div class="price-was">€32.50</div>
+    </div>
+  </div>
+
+  <div class="card deal">
+    <div class="thumb" style="background:#1a1a1a"></div>
+    <div class="info">
+      <div class="title">A Love Supreme</div>
+      <div class="artist">John Coltrane</div>
+      <div class="meta">Rush Hour · NM · Verzending vanuit Amsterdam</div>
+      <span class="badge">−35% deal</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€22.50</div>
+      <div class="price-was">€34.99</div>
+    </div>
+  </div>
+
+  <div class="label">OVERIGE DEALS</div>
+
+  <div class="card deal">
+    <div class="thumb" style="background:#1a1a1a"></div>
+    <div class="info">
+      <div class="title">Bitches Brew (2LP)</div>
+      <div class="artist">Miles Davis</div>
+      <div class="meta">HHV.de · Nieuw · Verzending vanuit Duitsland</div>
+      <span class="badge">−31% deal</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€28.95</div>
+      <div class="price-was">€41.99</div>
+    </div>
+  </div>
+</div>
+
+<div style="height:80px"></div>
+<nav>
+  <button class="nav-btn on"><span class="ni">♪</span>Volgen</button>
+  <button class="nav-btn"><span class="ni">💿</span>Releases</button>
+  <button class="nav-btn"><span class="ni">🏷</span>Deals</button>
+  <button class="nav-btn"><span class="ni">⚙️</span>Instellingen</button>
+</nav>
+</body></html>

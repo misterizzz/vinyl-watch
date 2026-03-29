@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stijl B — Clean Modern</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#111111;--surface:#1a1a1a;--surface2:#222;--border:#2d2d2d;
+    --accent:#5b8def;--accent-dim:#2a3f6e;--red:#ef4444;
+    --text:#f5f5f5;--muted:#777;--green:#22c55e;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;max-width:420px;margin:0 auto;min-height:100vh;-webkit-font-smoothing:antialiased}
+
+  header{padding:16px;background:var(--bg);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+  .logo{font-size:20px;font-weight:700;letter-spacing:-0.5px}.logo span{color:var(--accent)}
+  .sync-btn{background:var(--accent);border:none;color:white;padding:7px 16px;border-radius:8px;font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer}
+
+  .label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:18px 16px 8px}
+
+  .pills{display:flex;gap:6px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+  .pills::-webkit-scrollbar{display:none}
+  .pill{background:var(--surface);border:none;border-radius:8px;padding:6px 14px;font-size:12px;color:var(--muted);white-space:nowrap;cursor:pointer;font-family:var(--font);font-weight:500}
+  .pill.on{color:white;background:var(--accent)}
+
+  .card{background:var(--surface);border:none;border-radius:12px;padding:12px;margin:6px 16px;display:flex;gap:12px;align-items:center}
+  .card.deal{background:linear-gradient(135deg,var(--surface) 0%,#1a2a1a 100%);border:1px solid #2a4a2a}
+  .thumb{width:52px;height:52px;border-radius:8px;background:var(--surface2);flex-shrink:0}
+  .info{flex:1;min-width:0}
+  .title{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .artist{font-size:12px;color:var(--accent);margin:1px 0}
+  .meta{font-size:11px;color:var(--muted)}
+  .badge{background:var(--green);color:white;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;display:inline-block;margin-top:4px}
+  .price{text-align:right;flex-shrink:0}
+  .price-now{font-size:16px;font-weight:700;color:var(--green)}
+  .price-was{font-size:11px;color:var(--muted);text-decoration:line-through}
+
+  .actions{display:flex;gap:6px;padding:0 16px;margin:10px 0}
+  .act{background:var(--surface);border:none;border-radius:12px;padding:14px 10px;flex:1;text-align:center;cursor:pointer}
+  .act .icon{font-size:22px;margin-bottom:4px}
+  .act .name{font-size:12px;font-weight:600}
+  .act .desc{font-size:10px;color:var(--muted)}
+
+  .item{background:var(--surface);border:none;border-radius:10px;padding:10px 12px;margin:5px 16px;display:flex;align-items:center;gap:10px}
+  .fav{font-size:14px;opacity:.2;cursor:pointer;flex-shrink:0}.fav.on{opacity:1;color:var(--accent)}
+  .item .name{font-weight:600;font-size:13px;flex:1}
+  .type{font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.3px}
+  .type.a{background:var(--accent-dim);color:var(--accent)}
+  .type.l{background:#3a1a1a;color:var(--red)}
+  .type.al{background:#1a2a1a;color:var(--green)}
+  .btns{display:flex;gap:4px}
+  .btn-sm{background:var(--surface2);border:none;color:var(--muted);padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:var(--font);font-weight:500}
+
+  nav{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-radius:16px;padding:6px;position:fixed;bottom:12px;left:16px;right:16px;max-width:388px;margin:0 auto}
+  .nav-btn{background:none;border:none;color:var(--muted);font-family:var(--font);font-size:10px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px;cursor:pointer;border-radius:12px}
+  .nav-btn .ni{font-size:18px}
+  .nav-btn.on{color:white;background:var(--accent)}
+
+  .section{padding:10px 0}
+  h2{font-size:18px;font-weight:700;padding:0 16px;margin-bottom:4px;letter-spacing:-0.3px}
+  .preview-tag{position:fixed;top:0;left:0;right:0;background:var(--accent);color:white;text-align:center;font-size:11px;font-weight:600;padding:4px;z-index:99;font-family:var(--font)}
+</style>
+</head>
+<body>
+<div class="preview-tag">STIJL B — Clean Modern (sans-serif, floating nav, soft cards)</div>
+
+<header style="margin-top:28px">
+  <div class="logo">Vinyl<span>Watch</span></div>
+  <button class="sync-btn">↻ Vernieuwen</button>
+</header>
+
+<div class="section">
+  <div class="actions">
+    <div class="act"><div class="icon">🎵</div><div class="name">XML</div><div class="desc">Apple Music</div></div>
+    <div class="act"><div class="icon">🔍</div><div class="name">Artiest</div><div class="desc">Toevoegen</div></div>
+    <div class="act"><div class="icon">🏷</div><div class="name">Label</div><div class="desc">Toevoegen</div></div>
+  </div>
+
+  <div class="pills" style="margin-bottom:10px">
+    <div class="pill on">Alle</div>
+    <div class="pill">★ Favorieten</div>
+    <div class="pill">Artiesten</div>
+    <div class="pill">Labels</div>
+    <div class="pill">Albums</div>
+  </div>
+
+  <div class="item">
+    <span class="fav on">★</span>
+    <span class="type a">artiest</span>
+    <span class="name">Miles Davis</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm" style="color:var(--green)">✓</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item" style="opacity:.4">
+    <span class="fav">★</span>
+    <span class="type a">artiest</span>
+    <span class="name">John Coltrane</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm">—</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item">
+    <span class="fav on">★</span>
+    <span class="type l">label</span>
+    <span class="name">Blue Note</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item">
+    <span class="fav">★</span>
+    <span class="type al">album</span>
+    <span class="name">Kind of Blue</span>
+    <div class="btns"><button class="btn-sm">💰 Top 5</button><button class="btn-sm">×</button></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Aanbiedingen</h2>
+  <div class="label">BUDGET ≤€25</div>
+
+  <div class="card deal">
+    <div class="thumb"></div>
+    <div class="info">
+      <div class="title">Kind of Blue (180g)</div>
+      <div class="artist">Miles Davis</div>
+      <div class="meta">JPC.de · Nieuw · Verz. vanuit Duitsland</div>
+      <span class="badge">−42%</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€18.99</div>
+      <div class="price-was">€32.50</div>
+    </div>
+  </div>
+
+  <div class="card deal">
+    <div class="thumb"></div>
+    <div class="info">
+      <div class="title">A Love Supreme</div>
+      <div class="artist">John Coltrane</div>
+      <div class="meta">Rush Hour · NM · Amsterdam</div>
+      <span class="badge">−35%</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€22.50</div>
+      <div class="price-was">€34.99</div>
+    </div>
+  </div>
+
+  <div class="label">OVERIGE</div>
+
+  <div class="card deal">
+    <div class="thumb"></div>
+    <div class="info">
+      <div class="title">Bitches Brew (2LP)</div>
+      <div class="artist">Miles Davis</div>
+      <div class="meta">HHV.de · Nieuw · Duitsland</div>
+      <span class="badge">−31%</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€28.95</div>
+      <div class="price-was">€41.99</div>
+    </div>
+  </div>
+</div>
+
+<div style="height:90px"></div>
+<nav>
+  <button class="nav-btn on"><span class="ni">♪</span>Volgen</button>
+  <button class="nav-btn"><span class="ni">💿</span>Releases</button>
+  <button class="nav-btn"><span class="ni">🏷</span>Deals</button>
+  <button class="nav-btn"><span class="ni">⚙️</span>Meer</button>
+</nav>
+</body></html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stijl C — Crate Digger</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a25;--border:#252535;
+    --accent:#f59e0b;--accent-dim:#78500d;--red:#ef4444;
+    --text:#eeeef2;--muted:#6b6b80;--green:#10b981;--purple:#8b5cf6;
+    --font-display:'Space Grotesk',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  body{background:var(--bg);color:var(--text);font-family:var(--font-display);font-size:14px;line-height:1.5;max-width:420px;margin:0 auto;min-height:100vh;-webkit-font-smoothing:antialiased}
+
+  header{padding:16px;background:linear-gradient(180deg,var(--surface) 0%,var(--bg) 100%);display:flex;align-items:center;justify-content:space-between}
+  .logo{font-size:22px;font-weight:700;letter-spacing:-1px}.logo span{background:linear-gradient(135deg,var(--accent),var(--red));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .sync-btn{background:none;border:1px solid var(--accent);color:var(--accent);padding:6px 16px;border-radius:6px;font-family:var(--font-mono);font-size:11px;cursor:pointer}
+
+  .label{font-family:var(--font-mono);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);margin:18px 16px 8px}
+
+  .pills{display:flex;gap:6px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+  .pills::-webkit-scrollbar{display:none}
+  .pill{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:11px;color:var(--muted);white-space:nowrap;cursor:pointer;font-family:var(--font-mono)}
+  .pill.on{border-color:var(--accent);color:var(--accent);background:var(--surface2)}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin:6px 16px;display:flex;gap:12px;align-items:center;position:relative;overflow:hidden}
+  .card.deal{border-color:var(--green)}
+  .card.deal::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;background:var(--green)}
+  .thumb{width:50px;height:50px;border-radius:6px;background:var(--surface2);flex-shrink:0;border:1px solid var(--border)}
+  .info{flex:1;min-width:0}
+  .title{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .artist{font-family:var(--font-mono);font-size:11px;color:var(--accent);margin:2px 0}
+  .meta{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+  .badge{background:var(--green);color:white;font-family:var(--font-mono);font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;display:inline-block;margin-top:3px}
+  .price{text-align:right;flex-shrink:0}
+  .price-now{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--green)}
+  .price-was{font-family:var(--font-mono);font-size:10px;color:var(--muted);text-decoration:line-through}
+
+  .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 16px;margin:10px 0}
+  .act{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 8px;text-align:center;cursor:pointer;transition:border-color .2s}
+  .act:hover{border-color:var(--accent)}
+  .act .icon{font-size:20px;margin-bottom:4px}
+  .act .name{font-size:11px;font-weight:700}
+  .act .desc{font-family:var(--font-mono);font-size:9px;color:var(--muted)}
+
+  .item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:5px 16px;display:flex;align-items:center;gap:8px}
+  .fav{font-size:14px;opacity:.2;cursor:pointer;flex-shrink:0}.fav.on{opacity:1;color:var(--accent)}
+  .item .name{font-weight:600;font-size:12px;flex:1}
+  .type{font-family:var(--font-mono);font-size:8px;font-weight:600;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.4px;border:1px solid}
+  .type.a{border-color:var(--accent);color:var(--accent)}
+  .type.l{border-color:var(--purple);color:var(--purple)}
+  .type.al{border-color:var(--green);color:var(--green)}
+  .btns{display:flex;gap:4px}
+  .btn-sm{background:none;border:1px solid var(--border);color:var(--muted);padding:3px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-family:var(--font-mono)}
+
+  nav{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--border);padding:6px 0;position:fixed;bottom:0;left:0;right:0;max-width:420px;margin:0 auto}
+  .nav-btn{background:none;border:none;color:var(--muted);font-family:var(--font-mono);font-size:9px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px;cursor:pointer}
+  .nav-btn .ni{font-size:18px}
+  .nav-btn.on{color:var(--accent)}
+
+  .section{padding:10px 0}
+  h2{font-size:18px;font-weight:700;padding:0 16px;margin-bottom:4px;letter-spacing:-0.5px}
+  .preview-tag{position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,var(--accent),var(--red));color:white;text-align:center;font-size:11px;font-weight:600;padding:4px;z-index:99;font-family:var(--font-mono)}
+</style>
+</head>
+<body>
+<div class="preview-tag">STIJL C — Crate Digger (tech-meets-vinyl, mono accenten)</div>
+
+<header style="margin-top:28px">
+  <div class="logo">Vinyl<span>Watch</span></div>
+  <button class="sync-btn">↻ sync</button>
+</header>
+
+<div class="section">
+  <div class="actions">
+    <div class="act"><div class="icon">🎵</div><div class="name">XML</div><div class="desc">IMPORT</div></div>
+    <div class="act"><div class="icon">🔍</div><div class="name">Artiest</div><div class="desc">ADD</div></div>
+    <div class="act"><div class="icon">🏷</div><div class="name">Label</div><div class="desc">ADD</div></div>
+  </div>
+
+  <div class="pills" style="margin-bottom:10px">
+    <div class="pill on">alle</div>
+    <div class="pill">★ favorieten</div>
+    <div class="pill">artiesten</div>
+    <div class="pill">labels</div>
+    <div class="pill">albums</div>
+  </div>
+
+  <div class="item">
+    <span class="fav on">★</span>
+    <span class="type a">artiest</span>
+    <span class="name">Miles Davis</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm" style="color:var(--green)">✓</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item" style="opacity:.4">
+    <span class="fav">★</span>
+    <span class="type a">artiest</span>
+    <span class="name">John Coltrane</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm">—</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item">
+    <span class="fav on">★</span>
+    <span class="type l">label</span>
+    <span class="name">Blue Note</span>
+    <div class="btns"><button class="btn-sm">🔍</button><button class="btn-sm">×</button></div>
+  </div>
+  <div class="item">
+    <span class="fav">★</span>
+    <span class="type al">album</span>
+    <span class="name">Kind of Blue</span>
+    <div class="btns"><button class="btn-sm">💰 top5</button><button class="btn-sm">×</button></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Aanbiedingen</h2>
+  <div class="label">// BUDGET ≤€25</div>
+
+  <div class="card deal">
+    <div class="thumb"></div>
+    <div class="info">
+      <div class="title">Kind of Blue (180g)</div>
+      <div class="artist">miles_davis</div>
+      <div class="meta">JPC.de · nieuw · duitsland</div>
+      <span class="badge">-42%</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€18.99</div>
+      <div class="price-was">€32.50</div>
+    </div>
+  </div>
+
+  <div class="card deal">
+    <div class="thumb"></div>
+    <div class="info">
+      <div class="title">A Love Supreme</div>
+      <div class="artist">john_coltrane</div>
+      <div class="meta">rush_hour · NM · amsterdam</div>
+      <span class="badge">-35%</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€22.50</div>
+      <div class="price-was">€34.99</div>
+    </div>
+  </div>
+
+  <div class="label">// OVERIGE</div>
+
+  <div class="card deal">
+    <div class="thumb"></div>
+    <div class="info">
+      <div class="title">Bitches Brew (2LP)</div>
+      <div class="artist">miles_davis</div>
+      <div class="meta">hhv.de · nieuw · duitsland</div>
+      <span class="badge">-31%</span>
+    </div>
+    <div class="price">
+      <div class="price-now">€28.95</div>
+      <div class="price-was">€41.99</div>
+    </div>
+  </div>
+</div>
+
+<div style="height:80px"></div>
+<nav>
+  <button class="nav-btn on"><span class="ni">♪</span>volgen</button>
+  <button class="nav-btn"><span class="ni">💿</span>releases</button>
+  <button class="nav-btn"><span class="ni">🏷</span>deals</button>
+  <button class="nav-btn"><span class="ni">⚙️</span>config</button>
+</nav>
+</body></html>
