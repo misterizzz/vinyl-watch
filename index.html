@@ -99,6 +99,9 @@
     .type-badge.artist { background: var(--gold-dim); color: white; }
     .type-badge.label { background: var(--red); color: white; }
     .type-badge.album { background: var(--green); color: white; }
+    .fav-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px; transition: transform 0.15s; opacity: 0.3; }
+    .fav-btn.on { opacity: 1; }
+    .fav-btn:hover { transform: scale(1.2); }
     .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 11px; margin-bottom: 7px; display: flex; gap: 10px; cursor: pointer; transition: border-color 0.2s; text-decoration: none; color: inherit; }
     .result-card:hover { border-color: var(--gold-dim); }
     .result-card.deal { border-color: var(--green); }
@@ -248,14 +251,17 @@
         </div>
         <div id="import-status" style="display:none;" class="status-card"></div>
 
-        <div class="release-filter-bar" id="volgen-filter-bar" style="margin-bottom:8px;">
+        <div class="release-filter-bar" id="volgen-filter-bar" style="margin-bottom:6px;">
           <button class="filter-pill active" data-vfilter="all">Alle</button>
+          <button class="filter-pill" data-vfilter="favorites">★ Favorieten</button>
           <button class="filter-pill" data-vfilter="artists">Artiesten</button>
           <button class="filter-pill" data-vfilter="labels">Labels</button>
           <button class="filter-pill" data-vfilter="albums">Albums</button>
         </div>
-        <div style="margin-bottom:8px;">
-          <input type="text" id="volgen-search" placeholder="Filter…" style="width:100%;font-size:12px;padding:7px 10px;">
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <input type="text" id="volgen-search" placeholder="Filter…" style="flex:1;font-size:12px;padding:7px 10px;">
+          <button class="search-deals-btn" id="select-all-btn" title="Alles selecteren" style="padding:5px 9px;">✓ Alle</button>
+          <button class="search-deals-btn" id="deselect-all-btn" title="Alles deselecteren" style="padding:5px 9px;">— Alle</button>
         </div>
 
         <div id="volgen-list"></div>
@@ -914,22 +920,38 @@ function toggleArtistActive(id) {
   if (a) { a.active = !a.active; save(); renderVolgen(); }
 }
 
+function toggleFavorite(type, id) {
+  let item;
+  if (type === 'artist') item = S.artists.find(x => x.id === id);
+  else if (type === 'label') item = S.labels.find(x => x.id === id);
+  else item = S.albums.find(x => x.releaseId === id);
+  if (item) { item.fav = !item.fav; save(); renderVolgen(); }
+}
+
+function selectAllArtists(active) {
+  S.artists.forEach(a => { a.active = active; });
+  save(); renderVolgen();
+  toast(active ? 'Alle artiesten geselecteerd' : 'Alle artiesten gedeselecteerd');
+}
+
+document.getElementById('select-all-btn').addEventListener('click', () => selectAllArtists(true));
+document.getElementById('deselect-all-btn').addEventListener('click', () => selectAllArtists(false));
+
 function renderVolgen() {
   const list = document.getElementById('volgen-list');
   const empty = document.getElementById('volgen-empty');
   const q = volgenSearch.toLowerCase();
 
   let items = [];
-  if (volgenFilter === 'all' || volgenFilter === 'artists') {
-    items.push(...S.artists.map(a => ({ ...a, _type: 'artist', _name: a.name, _sort: a.name.toLowerCase() })));
-  }
-  if (volgenFilter === 'all' || volgenFilter === 'labels') {
-    items.push(...S.labels.map(l => ({ ...l, _type: 'label', _name: l.name, _sort: l.name.toLowerCase() })));
-  }
-  if (volgenFilter === 'all' || volgenFilter === 'albums') {
-    items.push(...S.albums.map(a => ({ ...a, _type: 'album', _name: a.title, _sort: (a.artist + ' ' + a.title).toLowerCase() })));
-  }
+  const showArtists = volgenFilter === 'all' || volgenFilter === 'artists' || volgenFilter === 'favorites';
+  const showLabels = volgenFilter === 'all' || volgenFilter === 'labels' || volgenFilter === 'favorites';
+  const showAlbums = volgenFilter === 'all' || volgenFilter === 'albums' || volgenFilter === 'favorites';
 
+  if (showArtists) items.push(...S.artists.map(a => ({ ...a, _type: 'artist', _name: a.name, _sort: a.name.toLowerCase() })));
+  if (showLabels) items.push(...S.labels.map(l => ({ ...l, _type: 'label', _name: l.name, _sort: l.name.toLowerCase() })));
+  if (showAlbums) items.push(...S.albums.map(a => ({ ...a, _type: 'album', _name: a.title, _sort: (a.artist + ' ' + a.title).toLowerCase() })));
+
+  if (volgenFilter === 'favorites') items = items.filter(i => i.fav);
   if (q) items = items.filter(i => i._name.toLowerCase().includes(q) || (i.artist||'').toLowerCase().includes(q));
   items.sort((a, b) => a._sort.localeCompare(b._sort));
 
@@ -947,6 +969,7 @@ function renderVolgen() {
     if (item._type === 'artist') {
       const isActive = item.active !== false;
       return `<div class="artist-card ${isActive?'':'inactive'}" data-id="${item.id}" data-type="artist">
+        <button class="fav-btn ${item.fav?'on':''}" data-id="${item.id}" data-type="artist">★</button>
         <div style="min-width:0;flex:1;">
           <div class="artist-name"><span class="type-badge artist">artiest</span> ${esc(item.name)}</div>
           <div class="artist-meta">Discogs ID ${item.id}</div>
@@ -959,6 +982,7 @@ function renderVolgen() {
       </div>`;
     } else if (item._type === 'label') {
       return `<div class="artist-card" data-id="${item.id}" data-type="label">
+        <button class="fav-btn ${item.fav?'on':''}" data-id="${item.id}" data-type="label">★</button>
         <div style="min-width:0;flex:1;">
           <div class="artist-name"><span class="type-badge label">label</span> ${esc(item.name)}</div>
           <div class="artist-meta">Discogs ID ${item.id}</div>
@@ -970,6 +994,7 @@ function renderVolgen() {
       </div>`;
     } else {
       return `<div class="artist-card" data-id="${item.releaseId}" data-type="album">
+        <button class="fav-btn ${item.fav?'on':''}" data-id="${item.releaseId}" data-type="album">★</button>
         <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
           ${item.thumb?`<img src="${item.thumb}" style="width:36px;height:36px;border-radius:3px;flex-shrink:0;" loading="lazy">`:''}
           <div style="min-width:0;">
@@ -986,6 +1011,7 @@ function renderVolgen() {
   }).join('');
 
   // Event listeners
+  list.querySelectorAll('.fav-btn').forEach(btn => btn.addEventListener('click', () => toggleFavorite(btn.dataset.type, parseInt(btn.dataset.id))));
   list.querySelectorAll('.toggle-btn').forEach(btn => btn.addEventListener('click', () => toggleArtistActive(parseInt(btn.dataset.id))));
   list.querySelectorAll('.remove-btn').forEach(btn => {
     btn.addEventListener('click', () => {
