@@ -155,6 +155,20 @@
     .theme-toggle { background: var(--surface); border: none; color: var(--muted); width: 34px; height: 34px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; flex-shrink: 0; }
     .theme-toggle:hover { background: var(--surface2); }
 
+    /* ADD BAR */
+    .add-bar { display: flex; gap: 6px; margin-bottom: 8px; }
+    .add-pill { flex: 1; background: none; border: 1.5px solid var(--accent); color: var(--accent); border-radius: 10px; padding: 8px 4px; font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center; }
+    .add-pill:hover { background: var(--accent); color: #fff; }
+    .add-pill:active { transform: scale(0.97); }
+
+    /* FILTER DRAWER */
+    .filter-toggle { width: 100%; background: var(--surface); border: none; border-radius: 10px; padding: 8px 12px; font-family: var(--font); font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; transition: background 0.15s; }
+    .filter-toggle:hover { background: var(--surface2); }
+    .filter-toggle .chevron { margin-left: auto; transition: transform 0.2s; font-size: 10px; }
+    .filter-toggle.open .chevron { transform: rotate(180deg); }
+    .filter-drawer { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
+    .filter-drawer.open { max-height: 120px; }
+
     /* PULL TO REFRESH */
     .ptr-indicator { text-align: center; font-size: 12px; color: var(--muted); padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.2s, padding 0.2s; }
     .ptr-indicator.pulling { max-height: 40px; padding: 10px 0; }
@@ -226,47 +240,33 @@
 
       <!-- VOLGEN (combined: artists, labels, albums) -->
       <div class="view active" id="view-volgen">
-        <div class="actions-row" style="grid-template-columns:1fr 1fr 1fr;">
-          <div class="action-card" id="xml-import-btn">
-            <div class="ac-icon">🎵</div>
-            <div class="ac-title">XML import</div>
-            <div class="ac-desc">Apple Music</div>
-          </div>
-          <div class="action-card" id="search-artist-btn">
-            <div class="ac-icon">🔍</div>
-            <div class="ac-title">Artiest</div>
-            <div class="ac-desc">Toevoegen</div>
-          </div>
-          <div class="action-card" id="search-label-btn">
-            <div class="ac-icon">🏷</div>
-            <div class="ac-title">Label</div>
-            <div class="ac-desc">Toevoegen</div>
-          </div>
-        </div>
-        <div class="action-card" id="search-album-btn" style="margin-bottom:13px;">
-          <div class="ac-icon">💿</div>
-          <div class="ac-title">Album volgen</div>
-          <div class="ac-desc">Zoek een specifiek album — bekijk top 5 laagste prijzen</div>
+        <div class="add-bar">
+          <button class="add-pill" id="search-artist-btn">+ Artiest</button>
+          <button class="add-pill" id="search-label-btn">+ Label</button>
+          <button class="add-pill" id="search-album-btn">+ Album</button>
         </div>
         <div id="import-status" style="display:none;" class="status-card"></div>
 
-        <div class="release-filter-bar" id="volgen-filter-bar" style="margin-bottom:6px;">
-          <button class="filter-pill active" data-vfilter="all">Alle</button>
-          <button class="filter-pill" data-vfilter="favorites">★ Favorieten</button>
-          <button class="filter-pill" data-vfilter="artists">Artiesten</button>
-          <button class="filter-pill" data-vfilter="labels">Labels</button>
-          <button class="filter-pill" data-vfilter="albums">Albums</button>
-        </div>
-        <div style="display:flex;gap:6px;margin-bottom:8px;">
-          <input type="text" id="volgen-search" placeholder="Filter…" style="flex:1;font-size:12px;padding:7px 10px;">
-          <button class="search-deals-btn" id="select-all-btn" title="Alles selecteren" style="padding:5px 9px;">✓ Alle</button>
-          <button class="search-deals-btn" id="deselect-all-btn" title="Alles deselecteren" style="padding:5px 9px;">— Alle</button>
+        <button class="filter-toggle" id="filter-toggle">🔍 Filter <span id="filter-toggle-count"></span> <span class="chevron">▾</span></button>
+        <div class="filter-drawer" id="filter-drawer">
+          <div class="release-filter-bar" id="volgen-filter-bar" style="margin-bottom:6px;">
+            <button class="filter-pill active" data-vfilter="all">Alle</button>
+            <button class="filter-pill" data-vfilter="favorites">★ Favorieten</button>
+            <button class="filter-pill" data-vfilter="artists">Artiesten</button>
+            <button class="filter-pill" data-vfilter="labels">Labels</button>
+            <button class="filter-pill" data-vfilter="albums">Albums</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:4px;">
+            <input type="text" id="volgen-search" placeholder="Zoek…" style="flex:1;font-size:12px;padding:7px 10px;">
+            <button class="search-deals-btn" id="select-all-btn" title="Alles selecteren" style="padding:5px 9px;">✓ Alle</button>
+            <button class="search-deals-btn" id="deselect-all-btn" title="Alles deselecteren" style="padding:5px 9px;">— Alle</button>
+          </div>
         </div>
 
         <div id="volgen-list"></div>
         <div id="volgen-empty" class="empty" style="display:none;">
           <div class="ei">🎵</div><h3>Nog niets gevolgd</h3>
-          <p>Voeg artiesten, labels of albums toe.</p>
+          <p>Voeg artiesten, labels of albums toe via de knoppen hierboven.</p>
         </div>
       </div>
 
@@ -380,6 +380,11 @@
             Importeer JSON
             <input type="file" id="import-data-input" accept=".json" style="display:none;">
           </label>
+        </div>
+        <div class="setup-card" style="margin-bottom:10px;">
+          <h2>Apple Music importeren</h2>
+          <p style="font-size:13px;color:var(--muted);">Importeer artiesten uit je Apple Music bibliotheek XML.</p>
+          <button class="btn sm secondary" id="xml-import-btn" style="margin-top:4px;">XML importeren</button>
         </div>
         <div class="setup-card">
           <h2>Data wissen</h2>
@@ -1039,6 +1044,19 @@ document.getElementById('volgen-list').addEventListener('click', e => {
   }
 });
 
+function updateFilterToggleLabel() {
+  const parts = [];
+  if (volgenFilter !== 'all') parts.push(volgenFilter === 'favorites' ? '★' : volgenFilter);
+  if (volgenSearch) parts.push(`"${volgenSearch}"`);
+  document.getElementById('filter-toggle-count').textContent = parts.length ? `· ${parts.join(' · ')}` : '';
+}
+
+// Filter drawer toggle
+document.getElementById('filter-toggle').addEventListener('click', () => {
+  document.getElementById('filter-toggle').classList.toggle('open');
+  document.getElementById('filter-drawer').classList.toggle('open');
+});
+
 // Volgen filter + search
 document.getElementById('volgen-filter-bar').addEventListener('click', e => {
   const pill = e.target.closest('.filter-pill');
@@ -1050,10 +1068,12 @@ document.getElementById('volgen-filter-bar').addEventListener('click', e => {
   const showBulk = volgenFilter === 'all' || volgenFilter === 'artists' || volgenFilter === 'favorites';
   document.getElementById('select-all-btn').style.display = showBulk ? '' : 'none';
   document.getElementById('deselect-all-btn').style.display = showBulk ? '' : 'none';
+  updateFilterToggleLabel();
   renderVolgen();
 });
 document.getElementById('volgen-search').addEventListener('input', e => {
   volgenSearch = e.target.value.trim();
+  updateFilterToggleLabel();
   renderVolgen();
 });
 
