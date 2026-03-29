@@ -89,6 +89,9 @@
     .artist-meta { font-size: 11px; color: var(--muted); }
     .remove-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 4px; transition: color 0.2s; }
     .remove-btn:hover { color: var(--red); }
+    .search-deals-btn { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 12px; padding: 3px 8px; border-radius: 3px; transition: all 0.2s; font-family: var(--font-mono); }
+    .search-deals-btn:hover { border-color: var(--gold); color: var(--gold); }
+    .card-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
     .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 11px; margin-bottom: 7px; display: flex; gap: 10px; cursor: pointer; transition: border-color 0.2s; text-decoration: none; color: inherit; }
     .result-card:hover { border-color: var(--gold-dim); }
     .result-card.deal { border-color: var(--green); }
@@ -228,6 +231,9 @@
         <div class="section-header">
           <div class="section-title">Gevolgde artiesten</div>
           <span id="artist-count" style="font-size:11px;color:var(--muted);"></span>
+        </div>
+        <div style="margin-bottom:8px;">
+          <input type="text" id="artist-list-search" placeholder="Filter artiesten…" style="width:100%;font-size:12px;padding:7px 10px;">
         </div>
         <div id="artist-list"></div>
         <div id="artists-empty" class="empty" style="display:none;">
@@ -449,6 +455,16 @@
     </div>
     <div class="search-results" id="album-search-results"></div>
     <button class="btn secondary" id="close-album-search">Sluiten</button>
+  </div>
+</div>
+
+<!-- SHOP SEARCH RESULTS OVERLAY -->
+<div class="overlay" id="shop-results-overlay">
+  <div class="sheet" style="max-height:90vh;">
+    <div class="sheet-title" id="shop-results-title">Resultaten</div>
+    <div class="meta-label" id="shop-results-meta">Zoeken in alle winkels…</div>
+    <div class="search-results" id="shop-results-list" style="overflow-y:auto;flex:1;"></div>
+    <button class="btn secondary" id="close-shop-results">Sluiten</button>
   </div>
 </div>
 
@@ -895,19 +911,33 @@ document.getElementById('import-data-input').addEventListener('change', async e 
 });
 
 // ── RENDER ────────────────────────────────────
+let artistListFilter = '';
+
 function renderArtists() {
   const list = document.getElementById('artist-list');
   const empty = document.getElementById('artists-empty');
   document.getElementById('artist-count').textContent = S.artists.length ? `${S.artists.length} artiest(en)` : '';
   if (!S.artists.length) { list.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
-  list.innerHTML = S.artists.map(a=>`
+  const filtered = artistListFilter
+    ? S.artists.filter(a => a.name.toLowerCase().includes(artistListFilter.toLowerCase()))
+    : S.artists;
+  list.innerHTML = filtered.map(a=>`
     <div class="artist-card">
-      <div><div class="artist-name">${esc(a.name)}</div><div class="artist-meta">Discogs ID ${a.id}</div></div>
-      <button class="remove-btn" data-id="${a.id}">×</button>
+      <div style="min-width:0;"><div class="artist-name">${esc(a.name)}</div><div class="artist-meta">Discogs ID ${a.id}</div></div>
+      <div class="card-actions">
+        <button class="search-deals-btn" data-name="${esc(a.name)}" data-type="artist">🔍 Deals</button>
+        <button class="remove-btn" data-id="${a.id}">×</button>
+      </div>
     </div>`).join('');
   list.querySelectorAll('.remove-btn').forEach(btn=>btn.addEventListener('click',()=>removeArtist(parseInt(btn.dataset.id))));
+  list.querySelectorAll('.search-deals-btn').forEach(btn=>btn.addEventListener('click',()=>searchDealsFor(btn.dataset.name, btn.dataset.type)));
 }
+
+document.getElementById('artist-list-search').addEventListener('input', e => {
+  artistListFilter = e.target.value.trim();
+  renderArtists();
+});
 
 let releaseFilter = 'all';
 let releaseSearch = '';
@@ -1277,10 +1307,14 @@ function renderLabels() {
   empty.style.display='none';
   list.innerHTML = S.labels.map(l => `
     <div class="artist-card">
-      <div><div class="artist-name">${esc(l.name)}</div><div class="artist-meta">Discogs ID ${l.id}</div></div>
-      <button class="remove-btn" data-id="${l.id}">×</button>
+      <div style="min-width:0;"><div class="artist-name">${esc(l.name)}</div><div class="artist-meta">Discogs ID ${l.id}</div></div>
+      <div class="card-actions">
+        <button class="search-deals-btn" data-name="${esc(l.name)}" data-type="label">🔍 Deals</button>
+        <button class="remove-btn" data-id="${l.id}">×</button>
+      </div>
     </div>`).join('');
   list.querySelectorAll('.remove-btn').forEach(btn => btn.addEventListener('click', () => removeLabel(parseInt(btn.dataset.id))));
+  list.querySelectorAll('.search-deals-btn').forEach(btn => btn.addEventListener('click', () => searchDealsFor(btn.dataset.name, btn.dataset.type)));
 }
 
 function renderLabelReleases() {
@@ -1300,6 +1334,52 @@ function renderLabelReleases() {
         <div class="result-shop">${r.year||'?'}${r.catno?' · '+esc(r.catno):''}</div>
       </div>
     </a>`).join('');
+}
+
+// ── INDIVIDUAL DEAL SEARCH ───────────────────
+document.getElementById('close-shop-results').addEventListener('click', () => document.getElementById('shop-results-overlay').classList.remove('open'));
+document.getElementById('shop-results-overlay').addEventListener('click', e => { if (e.target.id === 'shop-results-overlay') e.target.classList.remove('open'); });
+
+async function searchDealsFor(name, type) {
+  const overlay = document.getElementById('shop-results-overlay');
+  const titleEl = document.getElementById('shop-results-title');
+  const metaEl = document.getElementById('shop-results-meta');
+  const listEl = document.getElementById('shop-results-list');
+
+  titleEl.textContent = `Deals: ${name}`;
+  metaEl.textContent = 'Zoeken in alle 13 winkels…';
+  listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">⏳ Zoeken…</div>';
+  overlay.classList.add('open');
+
+  try {
+    const results = await backendSearch(name, '', 0);
+    if (!results.length) {
+      listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Geen resultaten gevonden in webshops.</div>';
+      metaEl.textContent = `0 resultaten`;
+      return;
+    }
+    metaEl.textContent = `${results.length} resultaten uit ${[...new Set(results.map(r=>r.shop))].length} winkels`;
+    listEl.innerHTML = results.map(r => {
+      const price = r.total_price || r.price_eur || 0;
+      const condLabel = r.condition && r.condition !== '?' ? ` · ${esc(r.condition)}` : '';
+      const isDeal = r.is_deal || r.discount_pct >= 30;
+      return `<a class="result-card${isDeal?' deal':''}" href="${r.url}" target="_blank" rel="noopener" style="margin-bottom:6px;">
+        ${r.image_url?`<img class="result-thumb" src="${r.image_url}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
+        <div class="result-info">
+          <div class="result-title">${esc(r.title)}</div>
+          <div class="result-shop">${esc(r.shop)}${condLabel} · ${esc(r.shipping_note||'')}</div>
+          ${isDeal?`<span class="deal-badge">−${Math.round(r.discount_pct)}% deal</span>`:''}
+        </div>
+        <div class="price-col">
+          <div class="price-now" ${isDeal?'':'style="color:var(--text)"'}>€${price.toFixed(2)}</div>
+          ${r.shipping_cost?`<div style="font-size:10px;color:var(--muted);">+€${r.shipping_cost.toFixed(2)}</div>`:''}
+        </div>
+      </a>`;
+    }).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div class="error-msg" style="padding:20px;text-align:center;">Backend fout: ${err.message}<br><span style="font-size:11px;color:var(--muted);">Is de backend actief?</span></div>`;
+    metaEl.textContent = 'Fout bij zoeken';
+  }
 }
 
 // ── PULL TO REFRESH ──────────────────────────
