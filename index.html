@@ -92,6 +92,13 @@
     .search-deals-btn { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 12px; padding: 3px 8px; border-radius: 3px; transition: all 0.2s; font-family: var(--font-mono); }
     .search-deals-btn:hover { border-color: var(--gold); color: var(--gold); }
     .card-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+    .toggle-btn { background: none; border: 1px solid var(--green); color: var(--green); cursor: pointer; font-size: 11px; padding: 2px 7px; border-radius: 3px; transition: all 0.2s; font-family: var(--font-mono); }
+    .toggle-btn.off { border-color: var(--border); color: var(--muted); opacity: 0.6; }
+    .artist-card.inactive { opacity: 0.45; }
+    .type-badge { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px; display: inline-block; }
+    .type-badge.artist { background: var(--gold-dim); color: white; }
+    .type-badge.label { background: var(--red); color: white; }
+    .type-badge.album { background: var(--green); color: white; }
     .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 11px; margin-bottom: 7px; display: flex; gap: 10px; cursor: pointer; transition: border-color 0.2s; text-decoration: none; color: inherit; }
     .result-card:hover { border-color: var(--gold-dim); }
     .result-card.deal { border-color: var(--green); }
@@ -214,51 +221,51 @@
 
     <main id="main-scroll">
       <div class="ptr-indicator" id="ptr-indicator">↻ Trek omlaag om te vernieuwen</div>
-      <div class="view active" id="view-artists">
-        <div class="actions-row">
+
+      <!-- VOLGEN (combined: artists, labels, albums) -->
+      <div class="view active" id="view-volgen">
+        <div class="actions-row" style="grid-template-columns:1fr 1fr 1fr;">
           <div class="action-card" id="xml-import-btn">
             <div class="ac-icon">🎵</div>
-            <div class="ac-title">Apple Music XML</div>
-            <div class="ac-desc">Importeer je muziekbibliotheek</div>
+            <div class="ac-title">XML import</div>
+            <div class="ac-desc">Apple Music</div>
           </div>
           <div class="action-card" id="search-artist-btn">
             <div class="ac-icon">🔍</div>
-            <div class="ac-title">Artiest zoeken</div>
-            <div class="ac-desc">Handmatig toevoegen</div>
+            <div class="ac-title">Artiest</div>
+            <div class="ac-desc">Toevoegen</div>
           </div>
+          <div class="action-card" id="search-label-btn">
+            <div class="ac-icon">🏷</div>
+            <div class="ac-title">Label</div>
+            <div class="ac-desc">Toevoegen</div>
+          </div>
+        </div>
+        <div class="action-card" id="search-album-btn" style="margin-bottom:13px;">
+          <div class="ac-icon">💿</div>
+          <div class="ac-title">Album volgen</div>
+          <div class="ac-desc">Zoek een specifiek album — bekijk top 5 laagste prijzen</div>
         </div>
         <div id="import-status" style="display:none;" class="status-card"></div>
-        <div class="section-header">
-          <div class="section-title">Gevolgde artiesten</div>
-          <span id="artist-count" style="font-size:11px;color:var(--muted);"></span>
+
+        <div class="release-filter-bar" id="volgen-filter-bar" style="margin-bottom:8px;">
+          <button class="filter-pill active" data-vfilter="all">Alle</button>
+          <button class="filter-pill" data-vfilter="artists">Artiesten</button>
+          <button class="filter-pill" data-vfilter="labels">Labels</button>
+          <button class="filter-pill" data-vfilter="albums">Albums</button>
         </div>
         <div style="margin-bottom:8px;">
-          <input type="text" id="artist-list-search" placeholder="Filter artiesten…" style="width:100%;font-size:12px;padding:7px 10px;">
-        </div>
-        <div id="artist-list"></div>
-        <div id="artists-empty" class="empty" style="display:none;">
-          <div class="ei">🎵</div><h3>Nog geen artiesten</h3>
-          <p>Importeer je Apple Music bibliotheek of zoek een artiest.</p>
+          <input type="text" id="volgen-search" placeholder="Filter…" style="width:100%;font-size:12px;padding:7px 10px;">
         </div>
 
-        <div style="margin-top:18px;">
-          <div class="action-card" id="search-album-btn" style="margin-bottom:13px;">
-            <div class="ac-icon">💿</div>
-            <div class="ac-title">Album volgen</div>
-            <div class="ac-desc">Zoek een specifiek album om deals te vinden</div>
-          </div>
-          <div class="section-header">
-            <div class="section-title">Gevolgde albums</div>
-            <span id="album-count" style="font-size:11px;color:var(--muted);"></span>
-          </div>
-          <div id="album-list"></div>
-          <div id="albums-empty" class="empty" style="display:none;">
-            <div class="ei">💿</div><h3>Nog geen albums</h3>
-            <p>Zoek een album om te volgen en deals te vinden.</p>
-          </div>
+        <div id="volgen-list"></div>
+        <div id="volgen-empty" class="empty" style="display:none;">
+          <div class="ei">🎵</div><h3>Nog niets gevolgd</h3>
+          <p>Voeg artiesten, labels of albums toe.</p>
         </div>
       </div>
 
+      <!-- RELEASES -->
       <div class="view" id="view-releases">
         <div class="section-header" style="margin-bottom:8px;">
           <div class="section-title">Nieuwe releases</div>
@@ -279,9 +286,10 @@
         <div id="sync-info-r" class="sync-info"></div>
       </div>
 
+      <!-- DEALS (all: artists + labels + albums) -->
       <div class="view" id="view-deals">
         <div class="section-title">Aanbiedingen</div>
-        <div class="meta-label">≥30% onder mediaanprijs · alle winkels</div>
+        <div class="meta-label">Deals van artiesten, labels en albums · alle winkels</div>
 
         <div class="filter-bar" id="filter-bar">
           <div class="filter-section" style="width:100%;">
@@ -323,6 +331,7 @@
         <div id="sync-info-d" class="sync-info"></div>
       </div>
 
+      <!-- SETTINGS -->
       <div class="view" id="view-settings">
         <div class="section-title" style="margin-bottom:14px;">Instellingen</div>
         <div class="setup-card" style="margin-bottom:10px;">
@@ -372,37 +381,10 @@
           <button class="btn secondary" id="clear-data-btn" style="margin-top:4px;">Alles wissen</button>
         </div>
       </div>
-
-      <!-- LABELS -->
-      <div class="view" id="view-labels">
-        <div class="action-card" id="search-label-btn" style="margin-bottom:13px;">
-          <div class="ac-icon">🔍</div>
-          <div class="ac-title">Label / serie zoeken</div>
-          <div class="ac-desc">Bijv. "Blue Note Tone Poet", "ECM", "Verve"</div>
-        </div>
-        <div class="section-header">
-          <div class="section-title">Gevolgde labels</div>
-          <span id="label-count" style="font-size:11px;color:var(--muted);"></span>
-        </div>
-        <div id="label-list"></div>
-        <div id="labels-empty" class="empty" style="display:none;">
-          <div class="ei">🏷</div><h3>Nog geen labels</h3>
-          <p>Zoek een label of serie om te volgen.</p>
-        </div>
-        <div style="margin-top:16px;">
-          <div class="section-title" style="margin-bottom:11px;">Recente label releases</div>
-          <div id="label-releases-list"></div>
-          <div id="label-releases-empty" class="empty" style="display:none;">
-            <div class="ei">💿</div><h3>Nog geen releases</h3>
-            <p>Druk op "Vernieuwen" na het toevoegen van een label.</p>
-          </div>
-        </div>
-      </div>
     </main>
 
     <nav>
-      <button class="nav-btn active" data-tab="artists"><span class="nav-icon">♪</span>Artiesten</button>
-      <button class="nav-btn" data-tab="labels"><span class="nav-icon">🎙</span>Labels<span class="badge" id="badge-l" style="display:none;"></span></button>
+      <button class="nav-btn active" data-tab="volgen"><span class="nav-icon">♪</span>Volgen</button>
       <button class="nav-btn" data-tab="releases"><span class="nav-icon">💿</span>Releases<span class="badge" id="badge-r" style="display:none;"></span></button>
       <button class="nav-btn" data-tab="deals"><span class="nav-icon">🏷</span>Deals<span class="badge" id="badge-d" style="display:none;"></span></button>
       <button class="nav-btn" data-tab="settings"><span class="nav-icon">⚙️</span>Instellingen</button>
@@ -678,7 +660,7 @@ document.getElementById('xml-file-input').addEventListener('change', async e => 
     }
 
     save();
-    renderArtists();
+    renderVolgen();
     statusEl.innerHTML = `<span class="success-msg">✅ ${added} artiesten geïmporteerd!</span>`;
     setTimeout(() => document.getElementById('xml-overlay').classList.remove('open'), 2000);
   } catch (err) {
@@ -742,14 +724,14 @@ async function doSearch() {
 function addArtist(artist) {
   if (S.artists.some(a => a.id === artist.id)) return;
   S.artists.push({ ...artist, addedAt: new Date().toISOString() });
-  save(); renderArtists(); toast(`${artist.name} toegevoegd`);
+  save(); renderVolgen(); toast(`${artist.name} toegevoegd`);
 }
 
 function removeArtist(id) {
   S.artists = S.artists.filter(a => a.id !== id);
   S.releases = S.releases.filter(r => r.artistId !== id);
   S.deals = S.deals.filter(d => d.artistId !== id);
-  save(); renderArtists(); renderReleases(); renderDeals();
+  save(); renderVolgen(); renderReleases(); renderDeals();
 }
 
 // ── SYNC ──────────────────────────────────────
@@ -791,7 +773,8 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
 
 async function startSync() {
   if (S.syncing) return;
-  if (!S.artists.length && !S.albums.length) { toast('Voeg eerst artiesten of albums toe'); return; }
+  const hasActive = S.artists.some(a => a.active !== false) || S.albums.length || S.labels.length;
+  if (!hasActive) { toast('Voeg eerst artiesten, albums of labels toe'); return; }
   S.syncing = true;
   const oldDealCount = S.deals.length;
   const newReleases = [], newDeals = [];
@@ -803,12 +786,14 @@ async function startSync() {
   wakeBackend();
 
   const yr = new Date().getFullYear();
-  const totalSteps = S.artists.length + S.albums.length;
+  const activeCount = S.artists.filter(a => a.active !== false).length;
+  const totalSteps = activeCount + S.albums.length;
   let step = 0;
 
-  // Parallel artist sync: batches of 3
-  for (let i = 0; i < S.artists.length; i += 3) {
-    const batch = S.artists.slice(i, i + 3);
+  // Parallel artist sync: batches of 3 (skip inactive)
+  const activeArtists = S.artists.filter(a => a.active !== false);
+  for (let i = 0; i < activeArtists.length; i += 3) {
+    const batch = activeArtists.slice(i, i + 3);
     label.textContent = `${Math.min(i+3, S.artists.length)}/${totalSteps} ${batch.map(a=>a.name.slice(0,8)).join(', ')}`;
     await Promise.all(batch.map(a => syncOneArtist(a, yr, newReleases, newDeals)));
     step += batch.length;
@@ -874,7 +859,7 @@ document.getElementById('clear-data-btn').addEventListener('click', () => {
   if (!confirm('Weet je zeker dat je alle artiesten, releases en deals wil wissen?')) return;
   S.artists=[]; S.releases=[]; S.deals=[]; S.lastSync=null; S.albums=[]; S.labels=[]; S.labelReleases=[];
   ['vw_artists','vw_releases','vw_deals','vw_labels','vw_label_releases','vw_albums','vw_last_sync'].forEach(k=>localStorage.removeItem(k));
-  renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases(); toast('Data gewist');
+  renderVolgen(); renderReleases(); renderDeals(); renderLabelReleases(); toast('Data gewist');
 });
 
 // Theme settings buttons
@@ -914,60 +899,162 @@ document.getElementById('import-data-input').addEventListener('change', async e 
     S.releases = data.releases || []; S.deals = data.deals || [];
     S.labelReleases = data.labelReleases || []; S.lastSync = data.lastSync || null;
     save();
-    renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases();
+    renderVolgen(); renderReleases(); renderDeals(); renderLabelReleases();
     toast(`Backup hersteld!`);
   } catch (err) { toast(`Import fout: ${err.message}`); }
   e.target.value = '';
 });
 
 // ── RENDER ────────────────────────────────────
-let artistListFilter = '';
+let volgenFilter = 'all';
+let volgenSearch = '';
 
-function renderArtists() {
-  const list = document.getElementById('artist-list');
-  const empty = document.getElementById('artists-empty');
-  document.getElementById('artist-count').textContent = S.artists.length ? `${S.artists.length} artiest(en)` : '';
-  if (!S.artists.length) { list.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display='none';
-  const filtered = artistListFilter
-    ? S.artists.filter(a => a.name.toLowerCase().includes(artistListFilter.toLowerCase()))
-    : S.artists;
-  list.innerHTML = filtered.map(a=>`
-    <div class="artist-card">
-      <div style="min-width:0;"><div class="artist-name">${esc(a.name)}</div><div class="artist-meta">Discogs ID ${a.id}</div></div>
-      <div class="card-actions">
-        <button class="search-deals-btn" data-name="${esc(a.name)}" data-type="artist">🔍 Deals</button>
-        <button class="remove-btn" data-id="${a.id}">×</button>
-      </div>
-    </div>`).join('');
-  list.querySelectorAll('.remove-btn').forEach(btn=>btn.addEventListener('click',()=>removeArtist(parseInt(btn.dataset.id))));
-  list.querySelectorAll('.search-deals-btn').forEach(btn=>btn.addEventListener('click',()=>searchDealsFor(btn.dataset.name, btn.dataset.type)));
+function toggleArtistActive(id) {
+  const a = S.artists.find(x => x.id === id);
+  if (a) { a.active = !a.active; save(); renderVolgen(); }
 }
 
-document.getElementById('artist-list-search').addEventListener('input', e => {
-  artistListFilter = e.target.value.trim();
-  renderArtists();
+function renderVolgen() {
+  const list = document.getElementById('volgen-list');
+  const empty = document.getElementById('volgen-empty');
+  const q = volgenSearch.toLowerCase();
+
+  let items = [];
+  if (volgenFilter === 'all' || volgenFilter === 'artists') {
+    items.push(...S.artists.map(a => ({ ...a, _type: 'artist', _name: a.name, _sort: a.name.toLowerCase() })));
+  }
+  if (volgenFilter === 'all' || volgenFilter === 'labels') {
+    items.push(...S.labels.map(l => ({ ...l, _type: 'label', _name: l.name, _sort: l.name.toLowerCase() })));
+  }
+  if (volgenFilter === 'all' || volgenFilter === 'albums') {
+    items.push(...S.albums.map(a => ({ ...a, _type: 'album', _name: a.title, _sort: (a.artist + ' ' + a.title).toLowerCase() })));
+  }
+
+  if (q) items = items.filter(i => i._name.toLowerCase().includes(q) || (i.artist||'').toLowerCase().includes(q));
+  items.sort((a, b) => a._sort.localeCompare(b._sort));
+
+  if (!items.length && !S.artists.length && !S.labels.length && !S.albums.length) {
+    list.innerHTML = ''; empty.style.display = 'block'; return;
+  }
+  empty.style.display = 'none';
+
+  if (!items.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Geen resultaten voor filter.</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(item => {
+    if (item._type === 'artist') {
+      const isActive = item.active !== false;
+      return `<div class="artist-card ${isActive?'':'inactive'}" data-id="${item.id}" data-type="artist">
+        <div style="min-width:0;flex:1;">
+          <div class="artist-name"><span class="type-badge artist">artiest</span> ${esc(item.name)}</div>
+          <div class="artist-meta">Discogs ID ${item.id}</div>
+        </div>
+        <div class="card-actions">
+          <button class="toggle-btn ${isActive?'':'off'}" data-id="${item.id}" title="${isActive?'Deselecteer':'Selecteer'}">${isActive?'✓':'—'}</button>
+          <button class="search-deals-btn" data-name="${esc(item.name)}" data-type="artist">🔍</button>
+          <button class="remove-btn" data-id="${item.id}" data-type="artist">×</button>
+        </div>
+      </div>`;
+    } else if (item._type === 'label') {
+      return `<div class="artist-card" data-id="${item.id}" data-type="label">
+        <div style="min-width:0;flex:1;">
+          <div class="artist-name"><span class="type-badge label">label</span> ${esc(item.name)}</div>
+          <div class="artist-meta">Discogs ID ${item.id}</div>
+        </div>
+        <div class="card-actions">
+          <button class="search-deals-btn" data-name="${esc(item.name)}" data-type="label">🔍</button>
+          <button class="remove-btn" data-id="${item.id}" data-type="label">×</button>
+        </div>
+      </div>`;
+    } else {
+      return `<div class="artist-card" data-id="${item.releaseId}" data-type="album">
+        <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
+          ${item.thumb?`<img src="${item.thumb}" style="width:36px;height:36px;border-radius:3px;flex-shrink:0;" loading="lazy">`:''}
+          <div style="min-width:0;">
+            <div class="artist-name"><span class="type-badge album">album</span> ${esc(item.title)}</div>
+            <div class="artist-meta">${esc(item.artist)}${item.year?' · '+item.year:''}</div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="search-deals-btn" data-name="${esc(item.artist)}" data-title="${esc(item.title)}" data-relid="${item.releaseId}" data-type="album">💰 Top 5</button>
+          <button class="remove-btn" data-id="${item.releaseId}" data-type="album">×</button>
+        </div>
+      </div>`;
+    }
+  }).join('');
+
+  // Event listeners
+  list.querySelectorAll('.toggle-btn').forEach(btn => btn.addEventListener('click', () => toggleArtistActive(parseInt(btn.dataset.id))));
+  list.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = parseInt(btn.dataset.id);
+      if (btn.dataset.type === 'artist') removeArtist(id);
+      else if (btn.dataset.type === 'label') removeLabel(id);
+      else removeAlbum(id);
+    });
+  });
+  list.querySelectorAll('.search-deals-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.type === 'album') {
+        searchAlbumPrices(btn.dataset.name, btn.dataset.title, parseInt(btn.dataset.relid));
+      } else {
+        searchDealsFor(btn.dataset.name, btn.dataset.type);
+      }
+    });
+  });
+}
+
+// Volgen filter + search
+document.getElementById('volgen-filter-bar').addEventListener('click', e => {
+  const pill = e.target.closest('.filter-pill');
+  if (!pill) return;
+  volgenFilter = pill.dataset.vfilter;
+  pill.parentElement.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  renderVolgen();
+});
+document.getElementById('volgen-search').addEventListener('input', e => {
+  volgenSearch = e.target.value.trim();
+  renderVolgen();
 });
 
 let releaseFilter = 'all';
 let releaseSearch = '';
 
+function getAllReleases() {
+  // Merge artist releases + label releases
+  const all = [...S.releases];
+  S.labelReleases.forEach(lr => {
+    if (!all.some(r => r.id === lr.id)) {
+      all.push({ ...lr, artistName: lr.labelName || lr.title.split(' - ')[0], fromLabel: true });
+    }
+  });
+  return all.sort((a,b) => (b.year||0) - (a.year||0));
+}
+
 function buildReleaseFilterPills() {
   const bar = document.getElementById('release-filter-bar');
-  const artists = [...new Set(S.releases.map(r => r.artistName))].sort();
-  bar.innerHTML = `<button class="filter-pill ${releaseFilter==='all'?'active':''}" data-rfilter="all">Alle (${S.releases.length})</button>` +
-    artists.map(a => {
-      const cnt = S.releases.filter(r => r.artistName === a).length;
+  const allRel = getAllReleases();
+  const sources = [...new Set(allRel.map(r => r.artistName || r.labelName))].sort();
+  bar.innerHTML = `<button class="filter-pill ${releaseFilter==='all'?'active':''}" data-rfilter="all">Alle (${allRel.length})</button>` +
+    `<button class="filter-pill ${releaseFilter==='_artists'?'active':''}" data-rfilter="_artists">Artiesten (${S.releases.length})</button>` +
+    `<button class="filter-pill ${releaseFilter==='_labels'?'active':''}" data-rfilter="_labels">Labels (${S.labelReleases.length})</button>` +
+    sources.map(a => {
+      const cnt = allRel.filter(r => (r.artistName || r.labelName) === a).length;
       return `<button class="filter-pill ${releaseFilter===a?'active':''}" data-rfilter="${esc(a)}">${esc(a.length>15?a.slice(0,14)+'…':a)} (${cnt})</button>`;
     }).join('');
 }
 
 function getFilteredReleases() {
-  let filtered = S.releases;
-  if (releaseFilter !== 'all') filtered = filtered.filter(r => r.artistName === releaseFilter);
+  let filtered = getAllReleases();
+  if (releaseFilter === '_artists') filtered = filtered.filter(r => !r.fromLabel);
+  else if (releaseFilter === '_labels') filtered = filtered.filter(r => r.fromLabel);
+  else if (releaseFilter !== 'all') filtered = filtered.filter(r => (r.artistName || r.labelName) === releaseFilter);
   if (releaseSearch) {
     const q = releaseSearch.toLowerCase();
-    filtered = filtered.filter(r => r.title.toLowerCase().includes(q) || r.artistName.toLowerCase().includes(q));
+    filtered = filtered.filter(r => r.title.toLowerCase().includes(q) || (r.artistName||'').toLowerCase().includes(q));
   }
   return filtered;
 }
@@ -975,25 +1062,26 @@ function getFilteredReleases() {
 function renderReleases() {
   const list=document.getElementById('releases-list'), empty=document.getElementById('releases-empty'), badge=document.getElementById('badge-r');
   document.getElementById('sync-info-r').textContent = sinceText(S.lastSync);
-  document.getElementById('release-total').textContent = S.releases.length ? `${S.releases.length} release(s)` : '';
+  const allRelCount = getAllReleases().length;
+  document.getElementById('release-total').textContent = allRelCount ? `${allRelCount} release(s)` : '';
   buildReleaseFilterPills();
   const filtered = getFilteredReleases();
   if (!filtered.length) {
     list.innerHTML='';
-    empty.style.display = S.releases.length ? 'none' : 'block';
-    if (S.releases.length && !filtered.length) list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Geen releases gevonden voor deze filter.</div>';
-    badge.style.display = S.releases.length ? 'block' : 'none';
-    if (S.releases.length) { badge.textContent = S.releases.length > 99 ? '99+' : S.releases.length; }
+    empty.style.display = allRelCount ? 'none' : 'block';
+    if (allRelCount && !filtered.length) list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Geen releases gevonden voor deze filter.</div>';
+    badge.style.display = allRelCount ? 'block' : 'none';
+    if (allRelCount) { badge.textContent = allRelCount > 99 ? '99+' : allRelCount; }
     return;
   }
-  empty.style.display='none'; badge.textContent=S.releases.length>99?'99+':S.releases.length; badge.style.display='block';
+  empty.style.display='none'; badge.textContent=allRelCount>99?'99+':allRelCount; badge.style.display='block';
   list.innerHTML = filtered.map(r=>`
     <a class="result-card" href="${r.uri}" target="_blank" rel="noopener">
       ${r.thumb?`<img class="result-thumb" src="${r.thumb}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
       <div class="result-info">
         <div class="result-title">${esc(r.title)}</div>
         <div class="result-artist">${esc(r.artistName)}</div>
-        <div class="result-shop">${r.year||'?'} · Discogs · ${r.numForSale||0} te koop</div>
+        <div class="result-shop">${r.year||'?'} · ${r.fromLabel?'Label':'Discogs'}${r.numForSale?' · '+r.numForSale+' te koop':''}${r.catno?' · '+esc(r.catno):''}</div>
         ${r.lowestPrice?`<div class="result-shop">Laagste: €${r.lowestPrice.toFixed(2)}</div>`:''}
       </div>
     </a>`).join('');
@@ -1167,34 +1255,16 @@ async function doAlbumSearch() {
 function addAlbum(album) {
   if (S.albums.some(a => a.releaseId === album.releaseId)) return;
   S.albums.push({ ...album, addedAt: new Date().toISOString() });
-  save(); renderAlbums(); toast(`${album.title} toegevoegd`);
+  save(); renderVolgen(); toast(`${album.title} toegevoegd`);
 }
 
 function removeAlbum(releaseId) {
   S.albums = S.albums.filter(a => a.releaseId !== releaseId);
   S.deals = S.deals.filter(d => !d.fromAlbum || d.title !== S.albums.find(a=>a.releaseId===releaseId)?.title);
-  save(); renderAlbums(); renderDeals();
+  save(); renderVolgen(); renderDeals();
 }
 
-function renderAlbums() {
-  const list = document.getElementById('album-list');
-  const empty = document.getElementById('albums-empty');
-  document.getElementById('album-count').textContent = S.albums.length ? `${S.albums.length} album(s)` : '';
-  if (!S.albums.length) { list.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display='none';
-  list.innerHTML = S.albums.map(a => `
-    <div class="artist-card">
-      <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
-        ${a.thumb?`<img src="${a.thumb}" style="width:36px;height:36px;border-radius:3px;flex-shrink:0;" loading="lazy">`:''}
-        <div style="min-width:0;">
-          <div class="artist-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.title)}</div>
-          <div class="artist-meta">${esc(a.artist)}${a.year?' · '+a.year:''}</div>
-        </div>
-      </div>
-      <button class="remove-btn" data-id="${a.releaseId}">×</button>
-    </div>`).join('');
-  list.querySelectorAll('.remove-btn').forEach(btn => btn.addEventListener('click', () => removeAlbum(parseInt(btn.dataset.id))));
-}
+// renderAlbums merged into renderVolgen
 
 
 // ── LABELS ────────────────────────────────────
@@ -1244,13 +1314,13 @@ async function doLabelSearch() {
 function addLabel(label) {
   if (S.labels.some(l => l.id === label.id)) return;
   S.labels.push({ ...label, addedAt: new Date().toISOString() });
-  save(); renderLabels(); toast(`${label.name} toegevoegd`);
+  save(); renderVolgen(); renderLabelReleases(); toast(`${label.name} toegevoegd`);
 }
 
 function removeLabel(id) {
   S.labels = S.labels.filter(l => l.id !== id);
   S.labelReleases = S.labelReleases.filter(r => r.labelId !== id);
-  save(); renderLabels(); renderLabelReleases();
+  save(); renderVolgen(); renderLabelReleases();
 }
 
 async function syncLabels(newDeals) {
@@ -1308,47 +1378,73 @@ async function syncLabels(newDeals) {
   renderLabelReleases();
 }
 
-function renderLabels() {
-  const list = document.getElementById('label-list');
-  const empty = document.getElementById('labels-empty');
-  const count = document.getElementById('label-count');
-  count.textContent = S.labels.length ? `${S.labels.length} label(s)` : '';
-  if (!S.labels.length) { list.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display='none';
-  list.innerHTML = S.labels.map(l => `
-    <div class="artist-card">
-      <div style="min-width:0;"><div class="artist-name">${esc(l.name)}</div><div class="artist-meta">Discogs ID ${l.id}</div></div>
-      <div class="card-actions">
-        <button class="search-deals-btn" data-name="${esc(l.name)}" data-type="label">🔍 Deals</button>
-        <button class="remove-btn" data-id="${l.id}">×</button>
-      </div>
-    </div>`).join('');
-  list.querySelectorAll('.remove-btn').forEach(btn => btn.addEventListener('click', () => removeLabel(parseInt(btn.dataset.id))));
-  list.querySelectorAll('.search-deals-btn').forEach(btn => btn.addEventListener('click', () => searchDealsFor(btn.dataset.name, btn.dataset.type)));
-}
+// renderLabels merged into renderVolgen
 
 function renderLabelReleases() {
-  const list = document.getElementById('label-releases-list');
-  const empty = document.getElementById('label-releases-empty');
-  const badge = document.getElementById('badge-l');
-  if (!S.labelReleases.length) { list.innerHTML=''; empty.style.display='block'; badge.style.display='none'; return; }
-  empty.style.display='none';
-  badge.textContent = S.labelReleases.length > 99 ? '99+' : S.labelReleases.length;
-  badge.style.display='block';
-  list.innerHTML = S.labelReleases.map(r => `
-    <a class="result-card" href="${r.uri}" target="_blank" rel="noopener">
-      ${r.thumb?`<img class="result-thumb" src="${r.thumb}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
-      <div class="result-info">
-        <div class="result-title">${esc(r.title)}</div>
-        <div class="result-artist" style="color:var(--gold)">${esc(r.labelName)}</div>
-        <div class="result-shop">${r.year||'?'}${r.catno?' · '+esc(r.catno):''}</div>
-      </div>
-    </a>`).join('');
+  // Label releases are now shown in the releases view - no separate rendering needed
 }
 
 // ── INDIVIDUAL DEAL SEARCH ───────────────────
 document.getElementById('close-shop-results').addEventListener('click', () => document.getElementById('shop-results-overlay').classList.remove('open'));
 document.getElementById('shop-results-overlay').addEventListener('click', e => { if (e.target.id === 'shop-results-overlay') e.target.classList.remove('open'); });
+
+async function searchAlbumPrices(artist, title, releaseId) {
+  const overlay = document.getElementById('shop-results-overlay');
+  const titleEl = document.getElementById('shop-results-title');
+  const metaEl = document.getElementById('shop-results-meta');
+  const listEl = document.getElementById('shop-results-list');
+
+  titleEl.textContent = title;
+  metaEl.textContent = 'Top 5 laagste prijzen ophalen…';
+  listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);">⏳ Zoeken in alle winkels + Discogs…</div>';
+  overlay.classList.add('open');
+
+  const allResults = [];
+
+  // Discogs marketplace stats
+  try {
+    const st = await discogsGet(`/marketplace/stats/${releaseId}?curr_abbr=EUR`);
+    if (st.lowest_price?.value) {
+      allResults.push({ shop: 'Discogs', title: title, price_eur: st.lowest_price.value, total_price: st.lowest_price.value, url: `https://www.discogs.com/sell/list?release_id=${releaseId}&sort=price%2Casc`, shipping_note: 'Excl. verzendkosten', condition: '?', image_url: '', num_for_sale: st.num_for_sale || 0, median: st.median_price?.value || 0 });
+    }
+  } catch (_) {}
+
+  // Backend search
+  try {
+    const results = await backendSearch(artist, title, 0);
+    allResults.push(...results);
+  } catch (_) {}
+
+  // Sort by total_price, take top 5
+  allResults.sort((a, b) => (a.total_price || a.price_eur || 999) - (b.total_price || b.price_eur || 999));
+  const top5 = allResults.slice(0, 5);
+
+  if (!top5.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);">Geen resultaten gevonden.</div>';
+    metaEl.textContent = '0 resultaten';
+    return;
+  }
+
+  const median = top5[0].median || 0;
+  metaEl.textContent = `Top ${top5.length} laagste prijzen${median ? ` · mediaan €${median.toFixed(2)}` : ''}`;
+  listEl.innerHTML = top5.map((r, i) => {
+    const price = r.total_price || r.price_eur || 0;
+    const condLabel = r.condition && r.condition !== '?' ? ` · ${esc(r.condition)}` : '';
+    const rankColors = ['var(--gold)', 'var(--text)', 'var(--text)', 'var(--muted)', 'var(--muted)'];
+    return `<a class="result-card" href="${r.url}" target="_blank" rel="noopener" style="margin-bottom:6px;">
+      <div style="width:24px;font-size:16px;font-weight:900;color:${rankColors[i]};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</div>
+      <div class="result-info">
+        <div class="result-title">${esc(r.shop)}</div>
+        <div class="result-shop">${esc(r.title)}${condLabel}</div>
+        <div class="result-shop">${esc(r.shipping_note||'')}${r.num_for_sale?' · '+r.num_for_sale+' te koop':''}</div>
+      </div>
+      <div class="price-col">
+        <div class="price-now" style="color:${i===0?'var(--green)':'var(--text)'}">€${price.toFixed(2)}</div>
+        ${r.shipping_cost?`<div style="font-size:10px;color:var(--muted);">incl. €${r.shipping_cost.toFixed(2)} verz.</div>`:''}
+      </div>
+    </a>`;
+  }).join('');
+}
 
 async function searchDealsFor(name, type) {
   const overlay = document.getElementById('shop-results-overlay');
@@ -1487,7 +1583,7 @@ function showApp() {
   document.getElementById('setup-view').style.display='none';
   const m=document.getElementById('main-app'); m.style.display='flex';
   document.getElementById('settings-backend-url').value = S.backendUrl;
-  renderArtists(); renderAlbums(); renderReleases(); renderDeals(); renderLabels(); renderLabelReleases();
+  renderVolgen(); renderReleases(); renderDeals(); renderLabelReleases();
   updateThemeButtons();
   updateAutoSyncButtons();
   wakeBackend();
