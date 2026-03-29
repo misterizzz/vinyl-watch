@@ -843,7 +843,7 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
         try { await delay(DELAY); const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`); median = st.median_price?.value||0; medianPrice=median; } catch(_){}
         const obj = { id:rel.id, artistId:artist.id, artistName:artist.name, title:det.title, year:det.year, thumb:det.thumb||det.images?.[0]?.resource_url||'', uri:`https://www.discogs.com/release/${rel.id}`, lowestPrice:det.lowest_price||0, medianPrice:median, numForSale:det.num_for_sale||0 };
         newReleases.push(obj);
-        if (median && det.lowest_price && det.lowest_price <= median*DEAL_THRESHOLD) {
+        if (median && det.lowest_price && det.lowest_price < median) {
           newDeals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace', condition:'?' });
         }
       } catch(_){}
@@ -852,8 +852,8 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
     if (BACKEND) {
       try {
         const shopResults = await backendSearch(artist.name, '', medianPrice);
-        shopResults.filter(r=>r.is_deal).forEach(d => {
-          newDeals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur });
+        shopResults.forEach(d => {
+          newDeals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct||0, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur });
         });
       } catch(e){ console.warn(`Backend fout ${artist.name}:`, e.message); }
     }
@@ -904,7 +904,7 @@ async function startSync() {
             await delay(DELAY);
             const st = await discogsGet(`/marketplace/stats/${album.releaseId}?curr_abbr=EUR`);
             median = st.median_price?.value || 0;
-            if (median && st.lowest_price?.value && st.lowest_price.value <= median*DEAL_THRESHOLD) {
+            if (median && st.lowest_price?.value && st.lowest_price.value < median) {
               newDeals.push({ artistName:album.artist, title:album.title, shop:'Discogs', price_eur:st.lowest_price.value, discount_pct:Math.round((1-st.lowest_price.value/median)*100), medianPrice:median, url:`https://www.discogs.com/sell/list?release_id=${album.releaseId}&sort=price%2Casc`, thumb:album.thumb, shipping_note:'Zie Discogs marketplace', condition:'?', total_price:st.lowest_price.value, fromAlbum:true });
             }
           } catch(_){}
@@ -1583,14 +1583,14 @@ async function syncLabels(newDeals) {
             await delay(DELAY);
             const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`);
             const median = st.median_price?.value || 0;
-            if (median && st.lowest_price?.value && st.lowest_price.value <= median * DEAL_THRESHOLD) {
+            if (median && st.lowest_price?.value && st.lowest_price.value < median) {
               newDeals.push({ artistName: rel.artist || label.name, title: rel.title, shop: 'Discogs', price_eur: st.lowest_price.value, discount_pct: Math.round((1 - st.lowest_price.value / median) * 100), medianPrice: median, url: `https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, thumb: rel.thumb || '', shipping_note: 'Zie Discogs marketplace', condition: '?', total_price: st.lowest_price.value, fromLabel: true });
             }
             // Also check backend shops for label releases
             if (BACKEND && rel.artist) {
               try {
                 const shopResults = await backendSearch(rel.artist, rel.title, median);
-                shopResults.filter(r => r.is_deal).forEach(d => {
+                shopResults.forEach(d => {
                   newDeals.push({ artistName: rel.artist || label.name, title: d.title, shop: d.shop, price_eur: d.price_eur, discount_pct: d.discount_pct, medianPrice: median, url: d.url, thumb: d.image_url || rel.thumb || '', shipping_note: d.shipping_note, condition: d.condition || '?', total_price: d.total_price || d.price_eur, fromLabel: true });
                 });
               } catch (_) {}
