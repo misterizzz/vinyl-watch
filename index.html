@@ -293,10 +293,7 @@
 
       <!-- DEALS (all: artists + labels + albums) -->
       <div class="view" id="view-deals">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-          <div class="section-title">Aanbiedingen</div>
-          <button class="add-pill" id="search-deals-all-btn" style="flex:none;padding:6px 14px;">💰 Zoek deals</button>
-        </div>
+        <div class="section-title" style="margin-bottom:4px;">Aanbiedingen</div>
         <div class="meta-label" id="deals-meta">Deals van artiesten, labels en albums · alle winkels</div>
 
         <div class="filter-bar" id="filter-bar">
@@ -347,7 +344,9 @@
 
         <div id="deals-empty" class="empty" style="display:none;">
           <div class="ei">💰</div><h3>Geen deals gevonden</h3>
-          <p>Op dit moment geen platen die aan je filters voldoen.</p>
+          <p>Zoek in alle winkels naar deals voor je artiesten en albums.</p>
+          <button class="btn" id="search-deals-all-btn" style="width:auto;padding:12px 28px;font-size:15px;margin-top:14px;">💰 Zoek deals</button>
+          <div id="deals-search-status" style="font-size:12px;color:var(--muted);margin-top:8px;min-height:18px;"></div>
         </div>
         <div id="sync-info-d" class="sync-info"></div>
       </div>
@@ -1431,8 +1430,7 @@ document.getElementById('search-deals-all-btn').addEventListener('click', async 
   const btn = document.getElementById('search-deals-all-btn');
   if (btn.disabled) return;
   btn.disabled = true;
-  const origText = btn.textContent;
-  const meta = document.getElementById('deals-meta');
+  const status = document.getElementById('deals-search-status');
 
   const favOnly = FILTERS.sel === 'fav';
   const artists = S.artists.filter(a => a.active !== false && (!favOnly || a.fav));
@@ -1443,11 +1441,12 @@ document.getElementById('search-deals-all-btn').addEventListener('click', async 
 
   const newDeals = [];
   wakeBackend();
+  btn.textContent = '⏳ Zoeken…';
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     btn.textContent = `⏳ ${i+1}/${items.length}`;
-    meta.textContent = `Zoeken: ${item.name.slice(0, 20)}…`;
+    if (status) status.textContent = `${item.name.slice(0, 25)}…`;
     try {
       const results = await backendSearch(item.name, item.title, 0);
       results.forEach(d => {
@@ -1466,9 +1465,9 @@ document.getElementById('search-deals-all-btn').addEventListener('click', async 
   save();
   renderDeals();
 
-  btn.textContent = origText;
+  btn.textContent = '💰 Zoek deals';
   btn.disabled = false;
-  meta.textContent = `${S.deals.length} deals gevonden · alle winkels`;
+  if (status) status.textContent = '';
   toast(`${newDeals.length} resultaten uit webshops`);
 });
 
