@@ -1439,7 +1439,12 @@ document.getElementById('search-deals-all-btn').addEventListener('click', async 
   const favOnly = FILTERS.sel === 'fav';
   const artists = S.artists.filter(a => a.active !== false && (!favOnly || isFav('artist', a.id)));
   const albums = S.albums.filter(a => a.active !== false && (!favOnly || isFav('album', a.releaseId)));
-  const items = [...artists.map(a => ({ name: a.name, title: '' })), ...albums.map(a => ({ name: a.artist, title: a.title }))];
+  const labels = S.labels.filter(l => l.active !== false && (!favOnly || isFav('label', l.id)));
+  const items = [
+    ...artists.map(a => ({ name: a.name, title: '' })),
+    ...albums.map(a => ({ name: a.artist, title: a.title })),
+    ...labels.map(l => ({ name: l.name, title: '' })),
+  ];
 
   if (!items.length) { toast(favOnly ? `Markeer eerst items als favoriet (${_favIds.size} fav totaal)` : 'Geen actieve artiesten of albums'); btn.disabled = false; return; }
 
