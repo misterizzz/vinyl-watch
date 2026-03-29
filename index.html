@@ -106,9 +106,8 @@
     .type-badge.artist { background: var(--accent-dim); color: var(--accent); }
     .type-badge.label { background: #3a1a1a; color: var(--red); }
     .type-badge.album { background: #1a2a1a; color: var(--green); }
-    .fav-star { font-size: 13px; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
-    .fav-star.on { opacity: 1; color: var(--accent); }
     .artist-card { cursor: pointer; position: relative; }
+    .artist-card.fav { background: linear-gradient(135deg, var(--surface) 60%, var(--accent-dim) 200%); border-left: 2px solid var(--accent); }
     .result-card { background: var(--surface); border: none; border-radius: 12px; padding: 12px; margin-bottom: 6px; display: flex; gap: 12px; cursor: pointer; transition: background 0.15s; text-decoration: none; color: inherit; }
     .result-card:hover { background: var(--surface2); }
     .result-card.deal { background: linear-gradient(135deg, var(--surface) 0%, #1a2a1a 100%); border: 1px solid #2a4a2a; }
@@ -299,10 +298,16 @@
 
         <div class="filter-bar" id="filter-bar">
           <div class="filter-section" style="width:100%;">
+            <div class="filter-label">Selectie</div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;">
+              <button class="filter-pill active" data-filter="sel" data-value="all">Alle</button>
+              <button class="filter-pill" data-filter="sel" data-value="fav">★ Favorieten</button>
+            </div>
+          </div>
+          <div class="filter-section" style="width:100%;margin-top:4px;">
             <div class="filter-label">Bron</div>
             <div style="display:flex;flex-wrap:wrap;gap:5px;">
               <button class="filter-pill active" data-filter="shop" data-value="all">Alle</button>
-              <button class="filter-pill" data-filter="shop" data-value="fav">★ Favorieten</button>
               <button class="filter-pill" data-filter="shop" data-value="discogs">Discogs</button>
               <button class="filter-pill" data-filter="shop" data-value="shops">Webshops</button>
             </div>
@@ -502,6 +507,7 @@ const S = {
 };
 
 const FILTERS = {
+  sel: 'all',
   shop: 'all',
   cond: 'VG+',
 };
@@ -1020,18 +1026,17 @@ function renderVolgen() {
     const isActive = item.active !== false;
     const id = item._type === 'album' ? item.releaseId : item.id;
     const typeBadge = showType ? `<span class="type-badge ${item._type}">${item._type === 'artist' ? 'artiest' : item._type}</span> ` : '';
-    const star = `<span class="fav-star ${item.fav?'on':''}">★</span>`;
     const nameText = item._type === 'album' ? esc(item.title) : esc(item._name);
     const metaText = item._type === 'album' ? `${esc(item.artist)}${item.year?' · '+item.year:''}` : `Discogs ${item.id}`;
     const thumb = item._type === 'album' && item.thumb ? `<img src="${item.thumb}" style="width:36px;height:36px;border-radius:6px;flex-shrink:0;" loading="lazy">` : '';
     const searchData = item._type === 'album'
       ? `data-name="${esc(item.artist)}" data-title="${esc(item.title)}" data-relid="${id}"`
       : `data-name="${esc(item._name)}"`;
+    const favClass = item.fav ? ' fav' : '';
 
     return `<div class="swipe-wrapper">
       <div class="swipe-delete" data-id="${id}" data-type="${item._type}">Verwijder</div>
-      <div class="swipe-inner artist-card ${isActive?'':'inactive'}" data-id="${id}" data-type="${item._type}" data-tap="fav">
-        ${star}
+      <div class="swipe-inner artist-card ${isActive?'':'inactive'}${favClass}" data-id="${id}" data-type="${item._type}">
         ${thumb}
         <div style="min-width:0;flex:1;">
           <div class="artist-name">${typeBadge}${nameText}</div>
@@ -1065,8 +1070,10 @@ document.getElementById('volgen-list').addEventListener('click', e => {
     menu.className = 'overflow-menu';
     menu.style.top = `${rect.bottom + 4}px`;
     menu.style.right = `${window.innerWidth - rect.right}px`;
+    const isFav = card.classList.contains('fav');
     menu.innerHTML = `
       <button data-action="search">${type==='album'?'💰 Top 5 prijzen':'🔍 Zoek deals'}</button>
+      <button data-action="fav">${isFav?'★ Favoriet verwijderen':'☆ Favoriet maken'}</button>
       <button data-action="toggle">${isActive?'Deactiveer':'Activeer'}</button>
       <button data-action="remove" class="danger">Verwijder</button>`;
     menu.addEventListener('click', ev => {
@@ -1074,6 +1081,8 @@ document.getElementById('volgen-list').addEventListener('click', e => {
       if (action === 'search') {
         if (type === 'album') searchAlbumPrices(overBtn.dataset.name, overBtn.dataset.title, parseInt(overBtn.dataset.relid));
         else searchDealsFor(overBtn.dataset.name, type);
+      } else if (action === 'fav') {
+        toggleFavorite(type, id);
       } else if (action === 'toggle') {
         if (type === 'artist') toggleArtistActive(id);
         else { const arr = type === 'label' ? S.labels : S.albums; const item = arr.find(x => (x.releaseId||x.id) === id); if (item) { item.active = !(item.active !== false); save(); renderVolgen(); } }
@@ -1087,13 +1096,6 @@ document.getElementById('volgen-list').addEventListener('click', e => {
     document.body.appendChild(menu);
     _activeMenu = menu;
     return;
-  }
-
-  // Tap card = toggle favorite
-  const card = e.target.closest('[data-tap="fav"]');
-  if (card) {
-    closeMenus();
-    toggleFavorite(card.dataset.type, parseInt(card.dataset.id));
   }
 
   // Swipe delete background tap
@@ -1302,10 +1304,13 @@ document.getElementById('release-search').addEventListener('input', e => {
 function filterDeals() {
   let filtered = S.deals;
 
-  // Shop filter
-  if (FILTERS.shop === 'fav') {
+  // Selection filter (favorieten)
+  if (FILTERS.sel === 'fav') {
     filtered = filtered.filter(d => isFavSource(d.artistName || d.title));
-  } else if (FILTERS.shop === 'discogs') {
+  }
+
+  // Shop/bron filter
+  if (FILTERS.shop === 'discogs') {
     filtered = filtered.filter(d => (d.shop||'Discogs').toLowerCase() === 'discogs');
   } else if (FILTERS.shop === 'shops') {
     filtered = filtered.filter(d => (d.shop||'Discogs').toLowerCase() !== 'discogs');
