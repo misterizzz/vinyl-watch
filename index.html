@@ -142,6 +142,15 @@
     /* THEME TOGGLE */
     .theme-toggle { background: none; border: 1px solid var(--border); color: var(--muted); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; flex-shrink: 0; }
     .theme-toggle:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* PULL TO REFRESH */
+    .ptr-indicator { text-align: center; font-size: 12px; color: var(--muted); padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.2s, padding 0.2s; }
+    .ptr-indicator.pulling { max-height: 40px; padding: 10px 0; }
+    .ptr-indicator.refreshing { max-height: 40px; padding: 10px 0; }
+
+    /* RELEASE FILTERS */
+    .release-filter-bar { display: flex; gap: 6px; margin-bottom: 11px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .release-filter-bar::-webkit-scrollbar { display: none; }
   </style>
 </head>
 <body>
@@ -200,7 +209,8 @@
       </div>
     </header>
 
-    <main>
+    <main id="main-scroll">
+      <div class="ptr-indicator" id="ptr-indicator">↻ Trek omlaag om te vernieuwen</div>
       <div class="view active" id="view-artists">
         <div class="actions-row">
           <div class="action-card" id="xml-import-btn">
@@ -244,7 +254,16 @@
       </div>
 
       <div class="view" id="view-releases">
-        <div class="section-title" style="margin-bottom:13px;">Nieuwe releases</div>
+        <div class="section-header" style="margin-bottom:8px;">
+          <div class="section-title">Nieuwe releases</div>
+          <span id="release-total" style="font-size:11px;color:var(--muted);"></span>
+        </div>
+        <div class="release-filter-bar" id="release-filter-bar">
+          <button class="filter-pill active" data-rfilter="all">Alle</button>
+        </div>
+        <div style="margin-bottom:10px;">
+          <input type="text" id="release-search" placeholder="Zoek in releases…" style="width:100%;font-size:12px;padding:7px 10px;">
+        </div>
         <div id="wake-r" class="wake-banner">⏳ Backend opstart… eerste keer kan 30–60 sec duren.</div>
         <div id="releases-list"></div>
         <div id="releases-empty" class="empty" style="display:none;">
@@ -710,10 +729,45 @@ function removeArtist(id) {
 // ── SYNC ──────────────────────────────────────
 document.getElementById('sync-btn').addEventListener('click', startSync);
 
+async function syncOneArtist(artist, yr, newReleases, newDeals) {
+  try {
+    const data = await discogsGet(`/artists/${artist.id}/releases?sort=year&sort_order=desc&per_page=50`);
+    await delay(DELAY);
+    const recent = (data.releases||[]).filter(r => { const y=parseInt(r.year); return (y===yr||y===yr-1)&&r.type==='release'; });
+    let medianPrice = 0;
+
+    for (const rel of recent.slice(0,5)) {
+      await delay(DELAY);
+      try {
+        const det = await discogsGet(`/releases/${rel.id}`);
+        const isVinyl = (det.formats||[]).some(f => f.name==='Vinyl'||(f.descriptions||[]).some(d=>['LP','7"','12"','10"'].includes(d)));
+        if (!isVinyl) continue;
+        let median = 0;
+        try { await delay(DELAY); const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`); median = st.median_price?.value||0; medianPrice=median; } catch(_){}
+        const obj = { id:rel.id, artistId:artist.id, artistName:artist.name, title:det.title, year:det.year, thumb:det.thumb||det.images?.[0]?.resource_url||'', uri:`https://www.discogs.com/release/${rel.id}`, lowestPrice:det.lowest_price||0, medianPrice:median, numForSale:det.num_for_sale||0 };
+        newReleases.push(obj);
+        if (median && det.lowest_price && det.lowest_price <= median*0.70) {
+          newDeals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace', condition:'?' });
+        }
+      } catch(_){}
+    }
+
+    if (S.backendUrl) {
+      try {
+        const shopResults = await backendSearch(artist.name, '', medianPrice);
+        shopResults.filter(r=>r.is_deal).forEach(d => {
+          newDeals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur });
+        });
+      } catch(e){ console.warn(`Backend fout ${artist.name}:`, e.message); }
+    }
+  } catch(err){ console.warn(`Fout ${artist.name}:`, err.message); }
+}
+
 async function startSync() {
   if (S.syncing) return;
   if (!S.artists.length && !S.albums.length) { toast('Voeg eerst artiesten of albums toe'); return; }
   S.syncing = true;
+  const oldDealCount = S.deals.length;
   const newReleases = [], newDeals = [];
   const btn = document.getElementById('sync-btn');
   const label = document.getElementById('sync-label');
@@ -726,72 +780,45 @@ async function startSync() {
   const totalSteps = S.artists.length + S.albums.length;
   let step = 0;
 
-  for (let i = 0; i < S.artists.length; i++) {
-    const artist = S.artists[i];
-    step++;
-    label.textContent = `${step}/${totalSteps} ${artist.name.slice(0,12)}`;
-    try {
-      const data = await discogsGet(`/artists/${artist.id}/releases?sort=year&sort_order=desc&per_page=50`);
-      await delay(DELAY);
-      const recent = (data.releases||[]).filter(r => { const y=parseInt(r.year); return (y===yr||y===yr-1)&&r.type==='release'; });
-      let medianPrice = 0;
-
-      for (const rel of recent.slice(0,5)) {
-        await delay(DELAY);
-        try {
-          const det = await discogsGet(`/releases/${rel.id}`);
-          const isVinyl = (det.formats||[]).some(f => f.name==='Vinyl'||(f.descriptions||[]).some(d=>['LP','7"','12"','10"'].includes(d)));
-          if (!isVinyl) continue;
-          let median = 0;
-          try { await delay(DELAY); const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`); median = st.median_price?.value||0; medianPrice=median; } catch(_){}
-          const obj = { id:rel.id, artistId:artist.id, artistName:artist.name, title:det.title, year:det.year, thumb:det.thumb||det.images?.[0]?.resource_url||'', uri:`https://www.discogs.com/release/${rel.id}`, lowestPrice:det.lowest_price||0, medianPrice:median, numForSale:det.num_for_sale||0 };
-          newReleases.push(obj);
-          if (median && det.lowest_price && det.lowest_price <= median*0.70) {
-            newDeals.push({ ...obj, shop:'Discogs', price_eur:det.lowest_price, discount_pct:Math.round((1-det.lowest_price/median)*100), url:`https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, shipping_note:'Zie Discogs marketplace', condition:'?' });
-          }
-        } catch(_){}
-      }
-
-      // Backend shops
-      if (S.backendUrl) {
-        try {
-          const shopResults = await backendSearch(artist.name, '', medianPrice);
-          shopResults.filter(r=>r.is_deal).forEach(d => {
-            newDeals.push({ artistId:artist.id, artistName:artist.name, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct, medianPrice:medianPrice, url:d.url, thumb:d.image_url, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur });
-          });
-        } catch(e){ console.warn(`Backend fout ${artist.name}:`, e.message); }
-      }
-    } catch(err){ console.warn(`Fout ${artist.name}:`, err.message); }
+  // Parallel artist sync: batches of 3
+  for (let i = 0; i < S.artists.length; i += 3) {
+    const batch = S.artists.slice(i, i + 3);
+    label.textContent = `${Math.min(i+3, S.artists.length)}/${totalSteps} ${batch.map(a=>a.name.slice(0,8)).join(', ')}`;
+    await Promise.all(batch.map(a => syncOneArtist(a, yr, newReleases, newDeals)));
+    step += batch.length;
   }
 
-  // Sync followed albums
-  for (const album of S.albums) {
-    step++;
-    label.textContent = `${step}/${totalSteps} ${(album.title||'').slice(0,12)}`;
-    try {
-      let median = album.medianPrice || 0;
-      if (album.releaseId) {
-        try {
-          await delay(DELAY);
-          const st = await discogsGet(`/marketplace/stats/${album.releaseId}?curr_abbr=EUR`);
-          median = st.median_price?.value || 0;
-          if (median && st.lowest_price?.value && st.lowest_price.value <= median*0.70) {
-            newDeals.push({ artistName:album.artist, title:album.title, shop:'Discogs', price_eur:st.lowest_price.value, discount_pct:Math.round((1-st.lowest_price.value/median)*100), medianPrice:median, url:`https://www.discogs.com/sell/list?release_id=${album.releaseId}&sort=price%2Casc`, thumb:album.thumb, shipping_note:'Zie Discogs marketplace', condition:'?', total_price:st.lowest_price.value, fromAlbum:true });
-          }
-        } catch(_){}
-      }
-      if (S.backendUrl) {
-        try {
-          const shopResults = await backendSearch(album.artist, album.title, median);
-          shopResults.forEach(d => {
-            newDeals.push({ artistName:album.artist, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct||0, medianPrice:median, url:d.url, thumb:d.image_url||album.thumb, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur, fromAlbum:true });
-          });
-        } catch(e){ console.warn(`Album backend fout ${album.title}:`, e.message); }
-      }
-    } catch(err){ console.warn(`Album fout ${album.title}:`, err.message); }
+  // Sync followed albums (parallel batches of 3)
+  for (let i = 0; i < S.albums.length; i += 3) {
+    const batch = S.albums.slice(i, i + 3);
+    step += batch.length;
+    label.textContent = `${step}/${totalSteps} ${batch.map(a=>(a.title||'').slice(0,8)).join(', ')}`;
+    await Promise.all(batch.map(async album => {
+      try {
+        let median = album.medianPrice || 0;
+        if (album.releaseId) {
+          try {
+            await delay(DELAY);
+            const st = await discogsGet(`/marketplace/stats/${album.releaseId}?curr_abbr=EUR`);
+            median = st.median_price?.value || 0;
+            if (median && st.lowest_price?.value && st.lowest_price.value <= median*0.70) {
+              newDeals.push({ artistName:album.artist, title:album.title, shop:'Discogs', price_eur:st.lowest_price.value, discount_pct:Math.round((1-st.lowest_price.value/median)*100), medianPrice:median, url:`https://www.discogs.com/sell/list?release_id=${album.releaseId}&sort=price%2Casc`, thumb:album.thumb, shipping_note:'Zie Discogs marketplace', condition:'?', total_price:st.lowest_price.value, fromAlbum:true });
+            }
+          } catch(_){}
+        }
+        if (S.backendUrl) {
+          try {
+            const shopResults = await backendSearch(album.artist, album.title, median);
+            shopResults.forEach(d => {
+              newDeals.push({ artistName:album.artist, title:d.title, shop:d.shop, price_eur:d.price_eur, discount_pct:d.discount_pct||0, medianPrice:median, url:d.url, thumb:d.image_url||album.thumb, shipping_note:d.shipping_note, condition:d.condition||'?', total_price:d.total_price||d.price_eur, fromAlbum:true });
+            });
+          } catch(e){ console.warn(`Album backend fout ${album.title}:`, e.message); }
+        }
+      } catch(err){ console.warn(`Album fout ${album.title}:`, err.message); }
+    }));
   }
 
-  await syncLabels();
+  await syncLabels(newDeals);
   // Atomic update: only replace data after successful sync
   newReleases.sort((a,b)=>(b.year||0)-(a.year||0));
   newDeals.sort((a,b)=>(b.discount_pct||0)-(a.discount_pct||0));
@@ -803,7 +830,9 @@ async function startSync() {
   document.getElementById('wake-d').classList.remove('show');
   renderReleases(); renderDeals();
   S.syncing = false; btn.disabled = false; btn.classList.remove('spinning'); label.textContent = 'Vernieuwen';
+  const newDealsDiff = S.deals.length - oldDealCount;
   toast(`Klaar! ${S.releases.length} releases · ${S.deals.length} deal(s)`);
+  if (newDealsDiff > 0) notifyDeals(newDealsDiff);
 }
 
 // ── SETTINGS ──────────────────────────────────
@@ -880,12 +909,45 @@ function renderArtists() {
   list.querySelectorAll('.remove-btn').forEach(btn=>btn.addEventListener('click',()=>removeArtist(parseInt(btn.dataset.id))));
 }
 
+let releaseFilter = 'all';
+let releaseSearch = '';
+
+function buildReleaseFilterPills() {
+  const bar = document.getElementById('release-filter-bar');
+  const artists = [...new Set(S.releases.map(r => r.artistName))].sort();
+  bar.innerHTML = `<button class="filter-pill ${releaseFilter==='all'?'active':''}" data-rfilter="all">Alle (${S.releases.length})</button>` +
+    artists.map(a => {
+      const cnt = S.releases.filter(r => r.artistName === a).length;
+      return `<button class="filter-pill ${releaseFilter===a?'active':''}" data-rfilter="${esc(a)}">${esc(a.length>15?a.slice(0,14)+'…':a)} (${cnt})</button>`;
+    }).join('');
+}
+
+function getFilteredReleases() {
+  let filtered = S.releases;
+  if (releaseFilter !== 'all') filtered = filtered.filter(r => r.artistName === releaseFilter);
+  if (releaseSearch) {
+    const q = releaseSearch.toLowerCase();
+    filtered = filtered.filter(r => r.title.toLowerCase().includes(q) || r.artistName.toLowerCase().includes(q));
+  }
+  return filtered;
+}
+
 function renderReleases() {
   const list=document.getElementById('releases-list'), empty=document.getElementById('releases-empty'), badge=document.getElementById('badge-r');
   document.getElementById('sync-info-r').textContent = sinceText(S.lastSync);
-  if (!S.releases.length) { list.innerHTML=''; empty.style.display='block'; badge.style.display='none'; return; }
+  document.getElementById('release-total').textContent = S.releases.length ? `${S.releases.length} release(s)` : '';
+  buildReleaseFilterPills();
+  const filtered = getFilteredReleases();
+  if (!filtered.length) {
+    list.innerHTML='';
+    empty.style.display = S.releases.length ? 'none' : 'block';
+    if (S.releases.length && !filtered.length) list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Geen releases gevonden voor deze filter.</div>';
+    badge.style.display = S.releases.length ? 'block' : 'none';
+    if (S.releases.length) { badge.textContent = S.releases.length > 99 ? '99+' : S.releases.length; }
+    return;
+  }
   empty.style.display='none'; badge.textContent=S.releases.length>99?'99+':S.releases.length; badge.style.display='block';
-  list.innerHTML = S.releases.map(r=>`
+  list.innerHTML = filtered.map(r=>`
     <a class="result-card" href="${r.uri}" target="_blank" rel="noopener">
       ${r.thumb?`<img class="result-thumb" src="${r.thumb}" alt="" loading="lazy">`:`<div class="result-thumb">💿</div>`}
       <div class="result-info">
@@ -896,6 +958,18 @@ function renderReleases() {
       </div>
     </a>`).join('');
 }
+
+// Release filter + search events
+document.getElementById('release-filter-bar').addEventListener('click', e => {
+  const pill = e.target.closest('.filter-pill');
+  if (!pill) return;
+  releaseFilter = pill.dataset.rfilter;
+  renderReleases();
+});
+document.getElementById('release-search').addEventListener('input', e => {
+  releaseSearch = e.target.value.trim();
+  renderReleases();
+});
 
 function filterDeals() {
   let filtered = S.deals;
@@ -1139,9 +1213,10 @@ function removeLabel(id) {
   save(); renderLabels(); renderLabelReleases();
 }
 
-async function syncLabels() {
+async function syncLabels(newDeals) {
   if (!S.labels.length) return;
   const yr = new Date().getFullYear();
+  const newLabelReleases = [];
   for (const label of S.labels) {
     try {
       const data = await discogsGet(`/labels/${label.id}/releases?sort=year&sort_order=desc&per_page=50`);
@@ -1151,8 +1226,7 @@ async function syncLabels() {
         return y === yr || y === yr - 1;
       });
       for (const rel of recent.slice(0, 10)) {
-        if (S.labelReleases.some(r => r.id === rel.id)) continue;
-        S.labelReleases.push({
+        newLabelReleases.push({
           id: rel.id,
           labelId: label.id,
           labelName: label.name,
@@ -1163,8 +1237,32 @@ async function syncLabels() {
           catno: rel.catno || '',
         });
       }
+
+      // Label deals: check marketplace for top 3 releases
+      if (newDeals) {
+        for (const rel of recent.slice(0, 3)) {
+          try {
+            await delay(DELAY);
+            const st = await discogsGet(`/marketplace/stats/${rel.id}?curr_abbr=EUR`);
+            const median = st.median_price?.value || 0;
+            if (median && st.lowest_price?.value && st.lowest_price.value <= median * 0.70) {
+              newDeals.push({ artistName: rel.artist || label.name, title: rel.title, shop: 'Discogs', price_eur: st.lowest_price.value, discount_pct: Math.round((1 - st.lowest_price.value / median) * 100), medianPrice: median, url: `https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, thumb: rel.thumb || '', shipping_note: 'Zie Discogs marketplace', condition: '?', total_price: st.lowest_price.value, fromLabel: true });
+            }
+            // Also check backend shops for label releases
+            if (S.backendUrl && rel.artist) {
+              try {
+                const shopResults = await backendSearch(rel.artist, rel.title, median);
+                shopResults.filter(r => r.is_deal).forEach(d => {
+                  newDeals.push({ artistName: rel.artist || label.name, title: d.title, shop: d.shop, price_eur: d.price_eur, discount_pct: d.discount_pct, medianPrice: median, url: d.url, thumb: d.image_url || rel.thumb || '', shipping_note: d.shipping_note, condition: d.condition || '?', total_price: d.total_price || d.price_eur, fromLabel: true });
+                });
+              } catch (_) {}
+            }
+          } catch (_) {}
+        }
+      }
     } catch (err) { console.warn(`Label fout ${label.name}:`, err.message); }
   }
+  S.labelReleases = newLabelReleases;
   S.labelReleases.sort((a,b) => (b.year||0) - (a.year||0));
   save();
   renderLabelReleases();
@@ -1202,6 +1300,57 @@ function renderLabelReleases() {
         <div class="result-shop">${r.year||'?'}${r.catno?' · '+esc(r.catno):''}</div>
       </div>
     </a>`).join('');
+}
+
+// ── PULL TO REFRESH ──────────────────────────
+(function() {
+  const mainEl = document.getElementById('main-scroll');
+  const ptr = document.getElementById('ptr-indicator');
+  let startY = 0, pulling = false;
+
+  mainEl.addEventListener('touchstart', e => {
+    if (mainEl.scrollTop === 0) startY = e.touches[0].clientY;
+    else startY = 0;
+  }, { passive: true });
+
+  mainEl.addEventListener('touchmove', e => {
+    if (!startY) return;
+    const diff = e.touches[0].clientY - startY;
+    if (diff > 30 && mainEl.scrollTop === 0) {
+      pulling = true;
+      ptr.classList.add('pulling');
+      ptr.textContent = diff > 80 ? '↻ Laat los om te vernieuwen' : '↓ Trek omlaag…';
+    }
+  }, { passive: true });
+
+  mainEl.addEventListener('touchend', () => {
+    if (pulling) {
+      const diff = parseInt(ptr.textContent.includes('Laat los') ? '81' : '0');
+      if (diff > 80 || ptr.textContent.includes('Laat los')) {
+        ptr.textContent = '↻ Vernieuwen…';
+        ptr.classList.remove('pulling');
+        ptr.classList.add('refreshing');
+        startSync().finally(() => {
+          ptr.classList.remove('refreshing');
+        });
+      } else {
+        ptr.classList.remove('pulling');
+      }
+    }
+    pulling = false; startY = 0;
+  });
+})();
+
+// ── NOTIFICATIONS ───────────────────────────
+function notifyDeals(count) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    new Notification('VinylWatch', { body: `${count} nieuwe deal(s) gevonden!`, icon: 'icon.svg' });
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') new Notification('VinylWatch', { body: `${count} nieuwe deal(s) gevonden!`, icon: 'icon.svg' });
+    });
+  }
 }
 
 // ── INIT ─────────────────────────────────────
