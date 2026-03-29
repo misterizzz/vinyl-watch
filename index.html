@@ -672,7 +672,7 @@ document.getElementById('xml-file-input').addEventListener('change', async e => 
     statusEl.innerHTML = `<span class="success-msg">✅ ${added} artiesten geïmporteerd!</span>`;
     setTimeout(() => document.getElementById('xml-overlay').classList.remove('open'), 2000);
   } catch (err) {
-    statusEl.innerHTML = `<span class="error-msg">Fout: ${err.message}</span>`;
+    statusEl.innerHTML = `<span class="error-msg">Fout: ${esc(err.message)}</span>`;
   }
 });
 
@@ -725,7 +725,7 @@ async function doSearch() {
       });
     });
   } catch (err) {
-    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${err.message}</div>`;
+    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${esc(err.message)}</div>`;
   }
 }
 
@@ -876,7 +876,7 @@ document.getElementById('clear-data-btn').addEventListener('click', () => {
   if (!confirm('Weet je zeker dat je alle artiesten, releases en deals wil wissen?')) return;
   S.artists=[]; S.releases=[]; S.deals=[]; S.lastSync=null; S.albums=[]; S.labels=[]; S.labelReleases=[];
   ['vw_artists','vw_releases','vw_deals','vw_labels','vw_label_releases','vw_albums','vw_last_sync'].forEach(k=>localStorage.removeItem(k));
-  renderVolgen(); renderReleases(); renderDeals(); renderLabelReleases(); toast('Data gewist');
+  renderVolgen(); renderReleases(); renderDeals(); toast('Data gewist');
 });
 
 // Theme settings buttons
@@ -1057,14 +1057,15 @@ let releaseFilter = 'all';
 let releaseSearch = '';
 
 function getCachedAllReleases() {
-  // Merge artist releases + label releases
+  if (_cachedAllReleases) return _cachedAllReleases;
   const all = [...S.releases];
   S.labelReleases.forEach(lr => {
     if (!all.some(r => r.id === lr.id)) {
       all.push({ ...lr, artistName: lr.labelName || lr.title.split(' - ')[0], fromLabel: true });
     }
   });
-  return all.sort((a,b) => (b.year||0) - (a.year||0));
+  _cachedAllReleases = all.sort((a,b) => (b.year||0) - (a.year||0));
+  return _cachedAllReleases;
 }
 
 let _favSet = null;
@@ -1108,7 +1109,6 @@ function getFilteredReleases() {
 }
 
 let _cachedAllReleases = null;
-function getCachedAllReleases() { if (!_cachedAllReleases) _cachedAllReleases = getCachedAllReleases(); return _cachedAllReleases; }
 
 function renderReleases() {
   _cachedAllReleases = null; // rebuild on each render
@@ -1304,7 +1304,7 @@ async function doAlbumSearch() {
       });
     });
   } catch (err) {
-    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${err.message}</div>`;
+    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${esc(err.message)}</div>`;
   }
 }
 
@@ -1362,20 +1362,22 @@ async function doLabelSearch() {
       });
     });
   } catch (err) {
-    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${err.message}</div>`;
+    el.innerHTML = `<div class="error-msg" style="padding:10px;">Fout: ${esc(err.message)}</div>`;
   }
 }
 
 function addLabel(label) {
   if (S.labels.some(l => l.id === label.id)) return;
   S.labels.push({ ...label, addedAt: new Date().toISOString() });
-  save(); renderVolgen(); renderLabelReleases(); toast(`${label.name} toegevoegd`);
+  save(); renderVolgen(); renderReleases(); toast(`${label.name} toegevoegd`);
 }
 
 function removeLabel(id) {
   S.labels = S.labels.filter(l => l.id !== id);
   S.labelReleases = S.labelReleases.filter(r => r.labelId !== id);
-  save(); renderVolgen();}
+  S.deals = S.deals.filter(d => !d.fromLabel);
+  save(); renderVolgen(); renderReleases(); renderDeals();
+}
 
 async function syncLabels(newDeals) {
   const activeLabels = S.labels.filter(l => l.active !== false);
@@ -1532,7 +1534,7 @@ async function searchDealsFor(name, type) {
       </a>`;
     }).join('');
   } catch (err) {
-    listEl.innerHTML = `<div class="error-msg" style="padding:20px;text-align:center;">Backend fout: ${err.message}<br><span style="font-size:11px;color:var(--muted);">Is de backend actief?</span></div>`;
+    listEl.innerHTML = `<div class="error-msg" style="padding:20px;text-align:center;">Backend fout: ${esc(err.message)}<br><span style="font-size:11px;color:var(--muted);">Is de backend actief?</span></div>`;
     metaEl.textContent = 'Fout bij zoeken';
   }
 }
