@@ -1229,6 +1229,13 @@ function getCachedAllReleases() {
 
 // Favorites stored as separate Set in localStorage for reliability
 const _favIds = new Set(JSON.parse(localStorage.getItem('vw_favs') || '[]'));
+// Migrate old .fav properties to new system
+if (!_favIds.size) {
+  S.artists.filter(a => a.fav).forEach(a => _favIds.add(`artist:${a.id}`));
+  S.labels.filter(l => l.fav).forEach(l => _favIds.add(`label:${l.id}`));
+  S.albums.filter(a => a.fav).forEach(a => _favIds.add(`album:${a.releaseId}`));
+  if (_favIds.size) { localStorage.setItem('vw_favs', JSON.stringify([..._favIds])); }
+}
 function saveFavs() { localStorage.setItem('vw_favs', JSON.stringify([..._favIds])); }
 function isFav(type, id) { return _favIds.has(`${type}:${id}`); }
 function setFav(type, id, on) { if (on) _favIds.add(`${type}:${id}`); else _favIds.delete(`${type}:${id}`); saveFavs(); }
