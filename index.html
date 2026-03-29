@@ -301,6 +301,7 @@
             <div class="filter-label">Bron</div>
             <div style="display:flex;flex-wrap:wrap;gap:5px;">
               <button class="filter-pill active" data-filter="shop" data-value="all">Alle</button>
+              <button class="filter-pill" data-filter="shop" data-value="fav">★ Favorieten</button>
               <button class="filter-pill" data-filter="shop" data-value="discogs">Discogs</button>
               <button class="filter-pill" data-filter="shop" data-value="shops">Webshops</button>
             </div>
@@ -1067,11 +1068,19 @@ function getAllReleases() {
   return all.sort((a,b) => (b.year||0) - (a.year||0));
 }
 
+function isFavSource(name) {
+  return S.artists.some(a => a.fav && a.name === name)
+    || S.labels.some(l => l.fav && l.name === name)
+    || S.albums.some(a => a.fav && (a.artist === name || a.title === name));
+}
+
 function buildReleaseFilterPills() {
   const bar = document.getElementById('release-filter-bar');
   const allRel = getAllReleases();
+  const favCount = allRel.filter(r => isFavSource(r.artistName || r.labelName)).length;
   const sources = [...new Set(allRel.map(r => r.artistName || r.labelName))].sort();
   bar.innerHTML = `<button class="filter-pill ${releaseFilter==='all'?'active':''}" data-rfilter="all">Alle (${allRel.length})</button>` +
+    `<button class="filter-pill ${releaseFilter==='_fav'?'active':''}" data-rfilter="_fav">★ Favorieten (${favCount})</button>` +
     `<button class="filter-pill ${releaseFilter==='_artists'?'active':''}" data-rfilter="_artists">Artiesten (${S.releases.length})</button>` +
     `<button class="filter-pill ${releaseFilter==='_labels'?'active':''}" data-rfilter="_labels">Labels (${S.labelReleases.length})</button>` +
     sources.map(a => {
@@ -1082,7 +1091,8 @@ function buildReleaseFilterPills() {
 
 function getFilteredReleases() {
   let filtered = getAllReleases();
-  if (releaseFilter === '_artists') filtered = filtered.filter(r => !r.fromLabel);
+  if (releaseFilter === '_fav') filtered = filtered.filter(r => isFavSource(r.artistName || r.labelName));
+  else if (releaseFilter === '_artists') filtered = filtered.filter(r => !r.fromLabel);
   else if (releaseFilter === '_labels') filtered = filtered.filter(r => r.fromLabel);
   else if (releaseFilter !== 'all') filtered = filtered.filter(r => (r.artistName || r.labelName) === releaseFilter);
   if (releaseSearch) {
@@ -1136,7 +1146,9 @@ function filterDeals() {
   let filtered = S.deals;
 
   // Shop filter
-  if (FILTERS.shop === 'discogs') {
+  if (FILTERS.shop === 'fav') {
+    filtered = filtered.filter(d => isFavSource(d.artistName || d.title));
+  } else if (FILTERS.shop === 'discogs') {
     filtered = filtered.filter(d => (d.shop||'Discogs').toLowerCase() === 'discogs');
   } else if (FILTERS.shop === 'shops') {
     filtered = filtered.filter(d => (d.shop||'Discogs').toLowerCase() !== 'discogs');
