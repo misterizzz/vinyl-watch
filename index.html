@@ -495,14 +495,16 @@ const FILTERS = {
 const COND_RANK = { 'M': 5, 'NM': 4, 'NM or M-': 4, 'Nieuw': 4, 'VG+': 3, 'VG': 2, '?': 1 };
 
 const save = () => {
-  localStorage.setItem('vw_artists',  JSON.stringify(S.artists));
-  localStorage.setItem('vw_releases', JSON.stringify(S.releases));
-  localStorage.setItem('vw_deals',    JSON.stringify(S.deals));
-  localStorage.setItem('vw_labels', JSON.stringify(S.labels));
-  localStorage.setItem('vw_label_releases', JSON.stringify(S.labelReleases));
-  localStorage.setItem('vw_albums', JSON.stringify(S.albums));
-  if (S.lastSync) localStorage.setItem('vw_last_sync', S.lastSync);
-  _favSet = null; // invalidate fav cache
+  try {
+    localStorage.setItem('vw_artists',  JSON.stringify(S.artists));
+    localStorage.setItem('vw_releases', JSON.stringify(S.releases));
+    localStorage.setItem('vw_deals',    JSON.stringify(S.deals));
+    localStorage.setItem('vw_labels', JSON.stringify(S.labels));
+    localStorage.setItem('vw_label_releases', JSON.stringify(S.labelReleases));
+    localStorage.setItem('vw_albums', JSON.stringify(S.albums));
+    if (S.lastSync) localStorage.setItem('vw_last_sync', S.lastSync);
+  } catch (e) { toast('Opslag vol — verwijder oude data in instellingen'); }
+  _favSet = null;
 };
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
@@ -579,11 +581,12 @@ document.getElementById('test-backend-btn').addEventListener('click', async () =
   const url = document.getElementById('backend-url-input').value.trim().replace(/\/$/, '');
   const el = document.getElementById('backend-status');
   if (!url) { el.innerHTML = '<span class="error-msg">Vul een URL in.</span>'; return; }
+  try { const u = new URL(url); if (!['http:','https:'].includes(u.protocol)) throw 0; } catch { el.innerHTML = '<span class="error-msg">Ongeldige URL. Gebruik https://…</span>'; return; }
   el.innerHTML = '<span style="color:var(--muted);font-size:12px;">Verbinden…</span>';
   try {
     const r = await fetch(`${url}/ping`);
     const d = await r.json();
-    el.innerHTML = `<span class="success-msg">✅ Verbonden! Scrapers actief: ${(d.scrapers||[]).join(', ')}</span>`;
+    el.innerHTML = `<span class="success-msg">✅ Verbonden! Scrapers actief: ${esc((d.scrapers||[]).join(', '))}</span>`;
     S.backendUrl = url;
     localStorage.setItem('vw_backend', url);
   } catch {
@@ -866,7 +869,8 @@ async function startSync() {
 // ── SETTINGS ──────────────────────────────────
 document.getElementById('save-backend-btn').addEventListener('click', () => {
   const u = document.getElementById('settings-backend-url').value.trim().replace(/\/$/, '');
-  if (u) { S.backendUrl=u; localStorage.setItem('vw_backend',u); toast('Backend URL opgeslagen'); }
+  try { const p = new URL(u); if (!['http:','https:'].includes(p.protocol)) throw 0; } catch { toast('Ongeldige URL'); return; }
+  S.backendUrl=u; localStorage.setItem('vw_backend',u); toast('Backend URL opgeslagen');
 });
 document.getElementById('save-token-btn').addEventListener('click', () => {
   const t = document.getElementById('settings-token').value.trim();
