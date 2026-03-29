@@ -862,7 +862,8 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
 
 async function startSync() {
   if (S.syncing) return;
-  const hasActive = S.artists.some(a => a.active !== false) || S.albums.some(a => a.active !== false) || S.labels.some(l => l.active !== false);
+  const fav = FILTERS.sel === 'fav';
+  const hasActive = S.artists.some(a => a.active !== false && (!fav || a.fav)) || S.albums.some(a => a.active !== false && (!fav || a.fav)) || S.labels.some(l => l.active !== false && (!fav || l.fav));
   if (!hasActive) { toast('Voeg eerst artiesten, albums of labels toe'); return; }
   S.syncing = true;
   const oldDealCount = S.deals.length;
@@ -875,13 +876,13 @@ async function startSync() {
   wakeBackend();
 
   const yr = new Date().getFullYear();
-  const activeCount = S.artists.filter(a => a.active !== false).length;
-  const activeAlbumCount = S.albums.filter(a => a.active !== false).length;
-  const totalSteps = activeCount + activeAlbumCount;
+  const favOnly = FILTERS.sel === 'fav';
+  const activeArtists = S.artists.filter(a => a.active !== false && (!favOnly || a.fav));
+  const activeAlbumCount = S.albums.filter(a => a.active !== false && (!favOnly || a.fav)).length;
+  const totalSteps = activeArtists.length + activeAlbumCount;
   let step = 0;
 
-  // Parallel artist sync: batches of 3 (skip inactive)
-  const activeArtists = S.artists.filter(a => a.active !== false);
+  // Parallel artist sync: batches of 3 (skip inactive + fav filter)
   for (let i = 0; i < activeArtists.length; i += 3) {
     const batch = activeArtists.slice(i, i + 3);
     label.textContent = `${Math.min(i+3, activeArtists.length)}/${totalSteps} ${batch.map(a=>a.name.slice(0,8)).join(', ')}`;
@@ -890,7 +891,7 @@ async function startSync() {
   }
 
   // Sync followed albums (parallel batches of 3, skip inactive)
-  const activeAlbums = S.albums.filter(a => a.active !== false);
+  const activeAlbums = S.albums.filter(a => a.active !== false && (!favOnly || a.fav));
   for (let i = 0; i < activeAlbums.length; i += 3) {
     const batch = activeAlbums.slice(i, i + 3);
     step += batch.length;
@@ -1549,7 +1550,8 @@ function removeLabel(id) {
 }
 
 async function syncLabels(newDeals) {
-  const activeLabels = S.labels.filter(l => l.active !== false);
+  const favOnly = FILTERS.sel === 'fav';
+  const activeLabels = S.labels.filter(l => l.active !== false && (!favOnly || l.fav));
   if (!activeLabels.length) return;
   const yr = new Date().getFullYear();
   const newLabelReleases = [];
