@@ -203,18 +203,6 @@
     </svg>
 
     <div class="setup-card">
-      <span class="step-num">STAP 1</span>
-      <h2>Backend URL instellen</h2>
-      <p style="font-size:13px;color:var(--muted);">Heb je de backend nog niet gedeployd? Zie de README in de <code>vinyl-backend</code> map.</p>
-      <div><label>RENDER.COM URL</label>
-        <input type="url" id="backend-url-input" placeholder="https://vinyl-backend-xxxx.onrender.com" autocomplete="off">
-      </div>
-      <button class="btn" id="test-backend-btn">Verbinding testen →</button>
-      <div id="backend-status"></div>
-    </div>
-
-    <div class="setup-card">
-      <span class="step-num">STAP 2</span>
       <h2>Discogs token</h2>
       <ol>
         <li>Ga naar <strong>discogs.com</strong> → inloggen</li>
@@ -367,11 +355,6 @@
           </div>
         </div>
         <div class="setup-card" style="margin-bottom:10px;">
-          <h2>Backend URL</h2>
-          <input type="url" id="settings-backend-url" placeholder="https://vinyl-backend-xxxx.onrender.com">
-          <button class="btn sm" id="save-backend-btn" style="margin-top:4px;">Opslaan</button>
-        </div>
-        <div class="setup-card" style="margin-bottom:10px;">
           <h2>Discogs token</h2>
           <input type="password" id="settings-token" placeholder="••••••••••••">
           <button class="btn sm" id="save-token-btn" style="margin-top:4px;">Opslaan</button>
@@ -483,13 +466,13 @@
 
 <script>
 const DISCOGS = 'https://api.discogs.com';
+const BACKEND = 'https://vinyl-backend-5scv.onrender.com';
 const DELAY = 700;
-const DEAL_THRESHOLD = 0.70; // price <= median * this = deal
+const DEAL_THRESHOLD = 0.70;
 
 const S = {
   token:      localStorage.getItem('vw_token') || '',
   username:   localStorage.getItem('vw_username') || '',
-  backendUrl: localStorage.getItem('vw_backend') || '',
   artists:    JSON.parse(localStorage.getItem('vw_artists') || '[]'),
   releases:   JSON.parse(localStorage.getItem('vw_releases') || '[]'),
   deals:      JSON.parse(localStorage.getItem('vw_deals') || '[]'),
@@ -548,8 +531,8 @@ async function discogsGet(path) {
 }
 
 async function backendSearch(artist, title = '', median = 0) {
-  if (!S.backendUrl) return [];
-  const r = await fetch(`${S.backendUrl}/search`, {
+  if (!BACKEND) return [];
+  const r = await fetch(`${BACKEND}/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ artist, title, median_price_eur: median }),
@@ -560,8 +543,8 @@ async function backendSearch(artist, title = '', median = 0) {
 }
 
 async function wakeBackend() {
-  if (!S.backendUrl) return;
-  try { await fetch(`${S.backendUrl}/ping`); } catch (_) {}
+  if (!BACKEND) return;
+  try { await fetch(`${BACKEND}/ping`); } catch (_) {}
 }
 
 // ── THEME ─────────────────────────────────────
@@ -590,29 +573,11 @@ window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', ()
 });
 
 // ── SETUP ──────────────────────────────────────
-document.getElementById('test-backend-btn').addEventListener('click', async () => {
-  const url = document.getElementById('backend-url-input').value.trim().replace(/\/$/, '');
-  const el = document.getElementById('backend-status');
-  if (!url) { el.innerHTML = '<span class="error-msg">Vul een URL in.</span>'; return; }
-  try { const u = new URL(url); if (!['http:','https:'].includes(u.protocol)) throw 0; } catch { el.innerHTML = '<span class="error-msg">Ongeldige URL. Gebruik https://…</span>'; return; }
-  el.innerHTML = '<span style="color:var(--muted);font-size:12px;">Verbinden…</span>';
-  try {
-    const r = await fetch(`${url}/ping`);
-    const d = await r.json();
-    el.innerHTML = `<span class="success-msg">✅ Verbonden! Scrapers actief: ${esc((d.scrapers||[]).join(', '))}</span>`;
-    S.backendUrl = url;
-    localStorage.setItem('vw_backend', url);
-  } catch {
-    el.innerHTML = '<span class="error-msg">❌ Geen verbinding. Backend al gedeployd op Render.com?</span>';
-  }
-});
-
 document.getElementById('connect-btn').addEventListener('click', async () => {
   const token = document.getElementById('token-input').value.trim();
   const errEl = document.getElementById('setup-error');
   const btn = document.getElementById('connect-btn');
   if (!token) { errEl.textContent = 'Vul een Discogs token in.'; errEl.style.display='block'; return; }
-  if (!S.backendUrl) { errEl.textContent = 'Test eerst de backend verbinding (stap 1).'; errEl.style.display='block'; return; }
   btn.disabled = true; btn.textContent = 'Verbinden…'; errEl.style.display = 'none';
   try {
     S.token = token;
@@ -784,7 +749,7 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
       } catch(_){}
     }
 
-    if (S.backendUrl) {
+    if (BACKEND) {
       try {
         const shopResults = await backendSearch(artist.name, '', medianPrice);
         shopResults.filter(r=>r.is_deal).forEach(d => {
@@ -843,7 +808,7 @@ async function startSync() {
             }
           } catch(_){}
         }
-        if (S.backendUrl) {
+        if (BACKEND) {
           try {
             const shopResults = await backendSearch(album.artist, album.title, median);
             shopResults.forEach(d => {
@@ -880,11 +845,6 @@ async function startSync() {
 }
 
 // ── SETTINGS ──────────────────────────────────
-document.getElementById('save-backend-btn').addEventListener('click', () => {
-  const u = document.getElementById('settings-backend-url').value.trim().replace(/\/$/, '');
-  try { const p = new URL(u); if (!['http:','https:'].includes(p.protocol)) throw 0; } catch { toast('Ongeldige URL'); return; }
-  S.backendUrl=u; localStorage.setItem('vw_backend',u); toast('Backend URL opgeslagen');
-});
 document.getElementById('save-token-btn').addEventListener('click', () => {
   const t = document.getElementById('settings-token').value.trim();
   if (t) { S.token=t; localStorage.setItem('vw_token',t); toast('Token opgeslagen'); }
@@ -1541,7 +1501,7 @@ async function syncLabels(newDeals) {
               newDeals.push({ artistName: rel.artist || label.name, title: rel.title, shop: 'Discogs', price_eur: st.lowest_price.value, discount_pct: Math.round((1 - st.lowest_price.value / median) * 100), medianPrice: median, url: `https://www.discogs.com/sell/list?release_id=${rel.id}&sort=price%2Casc`, thumb: rel.thumb || '', shipping_note: 'Zie Discogs marketplace', condition: '?', total_price: st.lowest_price.value, fromLabel: true });
             }
             // Also check backend shops for label releases
-            if (S.backendUrl && rel.artist) {
+            if (BACKEND && rel.artist) {
               try {
                 const shopResults = await backendSearch(rel.artist, rel.title, median);
                 shopResults.filter(r => r.is_deal).forEach(d => {
@@ -1755,7 +1715,6 @@ function tryAutoSync() {
 function showApp() {
   document.getElementById('setup-view').style.display='none';
   const m=document.getElementById('main-app'); m.style.display='flex';
-  document.getElementById('settings-backend-url').value = S.backendUrl;
   renderVolgen(); renderReleases(); renderDeals();  updateThemeButtons();
   updateAutoSyncButtons();
   wakeBackend();
@@ -1766,12 +1725,12 @@ function showApp() {
 
 // Auto-sync when app returns to foreground
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && S.token && S.backendUrl) {
+  if (document.visibilityState === 'visible' && S.token) {
     tryAutoSync();
   }
 });
 
-if (S.token && S.username && S.backendUrl) showApp();
+if (S.token && S.username) showApp();
 
 if ('serviceWorker' in navigator) window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script>
