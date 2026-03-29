@@ -93,8 +93,7 @@
     .card-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
     .overflow-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; padding: 4px 6px; border-radius: 6px; transition: background 0.15s; line-height: 1; }
     .overflow-btn:hover { background: var(--surface2); color: var(--text); }
-    .overflow-menu { position: absolute; right: 8px; top: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 4px; z-index: 20; min-width: 150px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); display: none; }
-    .overflow-menu.open { display: block; }
+    .overflow-menu { position: fixed; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 4px; z-index: 200; min-width: 160px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
     .overflow-menu button { display: block; width: 100%; background: none; border: none; color: var(--text); font-family: var(--font); font-size: 13px; padding: 9px 12px; text-align: left; cursor: pointer; border-radius: 6px; transition: background 0.15s; }
     .overflow-menu button:hover { background: var(--border); }
     .overflow-menu button.danger { color: var(--red); }
@@ -1037,8 +1036,11 @@ document.getElementById('volgen-list').addEventListener('click', e => {
     const type = overBtn.dataset.type;
     const card = overBtn.closest('.swipe-inner');
     const isActive = !card.classList.contains('inactive');
+    const rect = overBtn.getBoundingClientRect();
     const menu = document.createElement('div');
-    menu.className = 'overflow-menu open';
+    menu.className = 'overflow-menu';
+    menu.style.top = `${rect.bottom + 4}px`;
+    menu.style.right = `${window.innerWidth - rect.right}px`;
     menu.innerHTML = `
       <button data-action="search">${type==='album'?'💰 Top 5 prijzen':'🔍 Zoek deals'}</button>
       <button data-action="toggle">${isActive?'Deactiveer':'Activeer'}</button>
@@ -1058,7 +1060,7 @@ document.getElementById('volgen-list').addEventListener('click', e => {
       }
       closeMenus();
     });
-    card.appendChild(menu);
+    document.body.appendChild(menu);
     _activeMenu = menu;
     return;
   }
