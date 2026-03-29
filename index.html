@@ -1432,9 +1432,8 @@ document.getElementById('search-deals-all-btn').addEventListener('click', async 
   btn.disabled = true;
   const status = document.getElementById('deals-search-status');
 
-  const favOnly = FILTERS.sel === 'fav';
-  const artists = S.artists.filter(a => a.active !== false && (!favOnly || a.fav));
-  const albums = S.albums.filter(a => a.active !== false && (!favOnly || a.fav));
+  const artists = S.artists.filter(a => a.active !== false);
+  const albums = S.albums.filter(a => a.active !== false);
   const items = [...artists.map(a => ({ name: a.name, title: '' })), ...albums.map(a => ({ name: a.artist, title: a.title }))];
 
   if (!items.length) { toast('Geen actieve artiesten of albums'); btn.disabled = false; return; }
