@@ -990,13 +990,10 @@ function toggleFavorite(type, id) {
   if (item) {
     item.fav = !item.fav;
     save();
-    // Verify save worked
-    const check = JSON.parse(localStorage.getItem('vw_artists')||'[]');
-    const saved = check.find(x => x.id === id);
-    console.log('toggleFavorite:', { type, id, newFav: item.fav, savedFav: saved?.fav, inMemoryFavCount: S.artists.filter(a=>a.fav).length });
+    const favCount = S.artists.filter(a=>a.fav).length + S.labels.filter(l=>l.fav).length + S.albums.filter(a=>a.fav).length;
     renderVolgen();
-    toast(item.fav ? `★ ${item.name||item.title} favoriet` : `☆ ${item.name||item.title} niet meer favoriet`);
-  } else { toast(`Item niet gevonden: ${type} #${id}`); }
+    toast(`${item.fav?'★':'☆'} ${item.name||item.title} · ${favCount} fav totaal`, 3000);
+  } else { toast(`Niet gevonden: ${type} #${id}`, 3000); }
 }
 
 function selectAllArtists(active) {
