@@ -987,7 +987,9 @@ function toggleFavorite(type, id) {
   if (type === 'artist') item = S.artists.find(x => x.id === id);
   else if (type === 'label') item = S.labels.find(x => x.id === id);
   else item = S.albums.find(x => x.releaseId === id);
-  if (item) { item.fav = !item.fav; save(); renderVolgen(); }
+  console.log('toggleFavorite:', { type, id, found: !!item, wasFav: item?.fav });
+  if (item) { item.fav = !item.fav; save(); renderVolgen(); toast(item.fav ? `★ ${item.name||item.title} favoriet` : `☆ ${item.name||item.title} niet meer favoriet`); }
+  else { toast(`Item niet gevonden: ${type} #${id}`); }
 }
 
 function selectAllArtists(active) {
