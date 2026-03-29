@@ -1,4 +1,4 @@
-const CACHE = 'vinylwatch-v4';
+const CACHE = 'vinylwatch-v5';
 const BASE = '/vinyl-watch';
 
 self.addEventListener('install', e => {

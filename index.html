@@ -528,7 +528,6 @@ const save = () => {
     localStorage.setItem('vw_albums', JSON.stringify(S.albums));
     if (S.lastSync) localStorage.setItem('vw_last_sync', S.lastSync);
   } catch (e) { toast('Opslag vol — verwijder oude data in instellingen'); }
-  _favSet = null;
 };
 
 const delay = ms => new Promise(r => setTimeout(r, ms));
@@ -865,8 +864,10 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
 async function startSync() {
   if (S.syncing) return;
   const favOnly = FILTERS.sel === 'fav';
-  const isMatch = x => x.active !== false && (!favOnly || x.fav);
-  const hasActive = S.artists.some(isMatch) || S.albums.some(isMatch) || S.labels.some(isMatch);
+  const isMatchArtist = a => a.active !== false && (!favOnly || isFav('artist', a.id));
+  const isMatchAlbum = a => a.active !== false && (!favOnly || isFav('album', a.releaseId));
+  const isMatchLabel = l => l.active !== false && (!favOnly || isFav('label', l.id));
+  const hasActive = S.artists.some(isMatchArtist) || S.albums.some(isMatchAlbum) || S.labels.some(isMatchLabel);
   if (!hasActive && favOnly) { toast('Markeer eerst items als favoriet (via ⋮ menu)'); return; }
   if (!hasActive) { toast('Voeg eerst artiesten, albums of labels toe'); return; }
   S.syncing = true;
@@ -880,8 +881,8 @@ async function startSync() {
   wakeBackend();
 
   const yr = new Date().getFullYear();
-  const activeArtists = S.artists.filter(isMatch);
-  const activeAlbumCount = S.albums.filter(isMatch).length;
+  const activeArtists = S.artists.filter(isMatchArtist);
+  const activeAlbumCount = S.albums.filter(isMatchAlbum).length;
   const totalSteps = activeArtists.length + activeAlbumCount;
   let step = 0;
 
@@ -894,7 +895,7 @@ async function startSync() {
   }
 
   // Sync followed albums (parallel batches of 3, skip inactive)
-  const activeAlbums = S.albums.filter(isMatch);
+  const activeAlbums = S.albums.filter(isMatchAlbum);
   for (let i = 0; i < activeAlbums.length; i += 3) {
     const batch = activeAlbums.slice(i, i + 3);
     step += batch.length;
@@ -983,17 +984,13 @@ function toggleArtistActive(id) {
 }
 
 function toggleFavorite(type, id) {
-  let item;
-  if (type === 'artist') item = S.artists.find(x => x.id === id);
-  else if (type === 'label') item = S.labels.find(x => x.id === id);
-  else item = S.albums.find(x => x.releaseId === id);
-  if (item) {
-    item.fav = !item.fav;
-    save();
-    const favCount = S.artists.filter(a=>a.fav).length + S.labels.filter(l=>l.fav).length + S.albums.filter(a=>a.fav).length;
-    renderVolgen();
-    toast(`${item.fav?'★':'☆'} ${item.name||item.title} · ${favCount} fav totaal`, 3000);
-  } else { toast(`Niet gevonden: ${type} #${id}`, 3000); }
+  const on = !isFav(type, id);
+  setFav(type, id, on);
+  const name = type === 'artist' ? S.artists.find(x=>x.id===id)?.name
+    : type === 'label' ? S.labels.find(x=>x.id===id)?.name
+    : S.albums.find(x=>x.releaseId===id)?.title;
+  renderVolgen();
+  toast(`${on?'★':'☆'} ${name||'?'} · ${_favIds.size} fav totaal`, 3000);
 }
 
 function selectAllArtists(active) {
@@ -1019,7 +1016,7 @@ function renderVolgen() {
   if (showLabels) items.push(...S.labels.map(l => ({ ...l, _type: 'label', _name: l.name, _sort: l.name.toLowerCase() })));
   if (showAlbums) items.push(...S.albums.map(a => ({ ...a, _type: 'album', _name: a.title, _sort: (a.artist + ' ' + a.title).toLowerCase() })));
 
-  if (volgenFilter === 'favorites') items = items.filter(i => i.fav);
+  if (volgenFilter === 'favorites') items = items.filter(i => isFav(i._type, i._type === 'album' ? i.releaseId : i.id));
   if (q) items = items.filter(i => i._name.toLowerCase().includes(q) || (i.artist||'').toLowerCase().includes(q));
   items.sort((a, b) => a._sort.localeCompare(b._sort));
 
@@ -1044,7 +1041,7 @@ function renderVolgen() {
     const searchData = item._type === 'album'
       ? `data-name="${esc(item.artist)}" data-title="${esc(item.title)}" data-relid="${id}"`
       : `data-name="${esc(item._name)}"`;
-    const favClass = item.fav ? ' fav' : '';
+    const favClass = isFav(item._type, id) ? ' fav' : '';
 
     return `<div class="swipe-wrapper">
       <div class="swipe-delete" data-id="${id}" data-type="${item._type}">Verwijder</div>
@@ -1082,10 +1079,10 @@ document.getElementById('volgen-list').addEventListener('click', e => {
     menu.className = 'overflow-menu';
     menu.style.top = `${rect.bottom + 4}px`;
     menu.style.right = `${window.innerWidth - rect.right}px`;
-    const isFav = card.classList.contains('fav');
+    const itemIsFav = isFav(type, id);
     menu.innerHTML = `
       <button data-action="search">${type==='album'?'💰 Top 5 prijzen':'🔍 Zoek deals'}</button>
-      <button data-action="fav">${isFav?'★ Favoriet verwijderen':'☆ Favoriet maken'}</button>
+      <button data-action="fav">${itemIsFav?'★ Favoriet verwijderen':'☆ Favoriet maken'}</button>
       <button data-action="toggle">${isActive?'Deactiveer':'Activeer'}</button>
       <button data-action="remove" class="danger">Verwijder</button>`;
     menu.addEventListener('click', ev => {
@@ -1230,16 +1227,16 @@ function getCachedAllReleases() {
   return _cachedAllReleases;
 }
 
-let _favSet = null;
-function rebuildFavSet() {
-  _favSet = new Set();
-  S.artists.filter(a => a.fav).forEach(a => _favSet.add(a.name));
-  S.labels.filter(l => l.fav).forEach(l => _favSet.add(l.name));
-  S.albums.filter(a => a.fav).forEach(a => { _favSet.add(a.artist); _favSet.add(a.title); });
-}
+// Favorites stored as separate Set in localStorage for reliability
+const _favIds = new Set(JSON.parse(localStorage.getItem('vw_favs') || '[]'));
+function saveFavs() { localStorage.setItem('vw_favs', JSON.stringify([..._favIds])); }
+function isFav(type, id) { return _favIds.has(`${type}:${id}`); }
+function setFav(type, id, on) { if (on) _favIds.add(`${type}:${id}`); else _favIds.delete(`${type}:${id}`); saveFavs(); }
+
 function isFavSource(name) {
-  if (!_favSet) rebuildFavSet();
-  return _favSet.has(name);
+  return S.artists.some(a => isFav('artist', a.id) && a.name === name)
+    || S.labels.some(l => isFav('label', l.id) && l.name === name)
+    || S.albums.some(a => isFav('album', a.releaseId) && (a.artist === name || a.title === name));
 }
 
 function buildReleaseFilterPills() {
@@ -1440,15 +1437,11 @@ document.getElementById('search-deals-all-btn').addEventListener('click', async 
   const status = document.getElementById('deals-search-status');
 
   const favOnly = FILTERS.sel === 'fav';
-  const match = x => x.active !== false && (!favOnly || x.fav);
-  const allArtists = S.artists.filter(a => a.active !== false);
-  const favArtists = S.artists.filter(a => a.fav);
-  console.log('Zoek deals:', { favOnly, total: allArtists.length, favs: favArtists.length, favNames: favArtists.map(a=>a.name), sel: FILTERS.sel });
-  const artists = S.artists.filter(match);
-  const albums = S.albums.filter(match);
+  const artists = S.artists.filter(a => a.active !== false && (!favOnly || isFav('artist', a.id)));
+  const albums = S.albums.filter(a => a.active !== false && (!favOnly || isFav('album', a.releaseId)));
   const items = [...artists.map(a => ({ name: a.name, title: '' })), ...albums.map(a => ({ name: a.artist, title: a.title }))];
 
-  if (!items.length) { toast(favOnly ? `Geen favorieten gevonden (${favArtists.length} fav van ${allArtists.length} actief)` : 'Geen actieve artiesten of albums'); btn.disabled = false; return; }
+  if (!items.length) { toast(favOnly ? `Markeer eerst items als favoriet (${_favIds.size} fav totaal)` : 'Geen actieve artiesten of albums'); btn.disabled = false; return; }
 
   const newDeals = [];
   wakeBackend();
@@ -1609,7 +1602,7 @@ function removeLabel(id) {
 }
 
 async function syncLabels(newDeals) {
-  const activeLabels = S.labels.filter(isMatch);
+  const activeLabels = S.labels.filter(isMatchLabel);
   if (!activeLabels.length) return;
   const yr = new Date().getFullYear();
   const newLabelReleases = [];
