@@ -864,7 +864,10 @@ async function syncOneArtist(artist, yr, newReleases, newDeals) {
 
 async function startSync() {
   if (S.syncing) return;
-  const hasActive = S.artists.some(a => a.active !== false) || S.albums.some(a => a.active !== false) || S.labels.some(l => l.active !== false);
+  const favOnly = FILTERS.sel === 'fav';
+  const isMatch = x => x.active !== false && (!favOnly || x.fav);
+  const hasActive = S.artists.some(isMatch) || S.albums.some(isMatch) || S.labels.some(isMatch);
+  if (!hasActive && favOnly) { toast('Markeer eerst items als favoriet (via ⋮ menu)'); return; }
   if (!hasActive) { toast('Voeg eerst artiesten, albums of labels toe'); return; }
   S.syncing = true;
   const oldDealCount = S.deals.length;
@@ -877,8 +880,8 @@ async function startSync() {
   wakeBackend();
 
   const yr = new Date().getFullYear();
-  const activeArtists = S.artists.filter(a => a.active !== false);
-  const activeAlbumCount = S.albums.filter(a => a.active !== false).length;
+  const activeArtists = S.artists.filter(isMatch);
+  const activeAlbumCount = S.albums.filter(isMatch).length;
   const totalSteps = activeArtists.length + activeAlbumCount;
   let step = 0;
 
@@ -891,7 +894,7 @@ async function startSync() {
   }
 
   // Sync followed albums (parallel batches of 3, skip inactive)
-  const activeAlbums = S.albums.filter(a => a.active !== false);
+  const activeAlbums = S.albums.filter(isMatch);
   for (let i = 0; i < activeAlbums.length; i += 3) {
     const batch = activeAlbums.slice(i, i + 3);
     step += batch.length;
@@ -1430,11 +1433,13 @@ document.getElementById('search-deals-all-btn').addEventListener('click', async 
   btn.disabled = true;
   const status = document.getElementById('deals-search-status');
 
-  const artists = S.artists.filter(a => a.active !== false);
-  const albums = S.albums.filter(a => a.active !== false);
+  const favOnly = FILTERS.sel === 'fav';
+  const match = x => x.active !== false && (!favOnly || x.fav);
+  const artists = S.artists.filter(match);
+  const albums = S.albums.filter(match);
   const items = [...artists.map(a => ({ name: a.name, title: '' })), ...albums.map(a => ({ name: a.artist, title: a.title }))];
 
-  if (!items.length) { toast('Geen actieve artiesten of albums'); btn.disabled = false; return; }
+  if (!items.length) { toast(favOnly ? 'Markeer eerst items als favoriet (via ⋮ menu)' : 'Geen actieve artiesten of albums'); btn.disabled = false; return; }
 
   const newDeals = [];
   wakeBackend();
@@ -1595,7 +1600,7 @@ function removeLabel(id) {
 }
 
 async function syncLabels(newDeals) {
-  const activeLabels = S.labels.filter(l => l.active !== false);
+  const activeLabels = S.labels.filter(isMatch);
   if (!activeLabels.length) return;
   const yr = new Date().getFullYear();
   const newLabelReleases = [];
