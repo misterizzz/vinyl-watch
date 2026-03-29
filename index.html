@@ -98,7 +98,8 @@
     .overflow-menu button:hover { background: var(--border); }
     .overflow-menu button.danger { color: var(--red); }
     .swipe-wrapper { position: relative; overflow: hidden; border-radius: 10px; margin-bottom: 5px; }
-    .swipe-delete { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--red); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 12px; font-weight: 600; }
+    .swipe-delete { position: absolute; right: 0; top: 0; bottom: 0; width: 80px; background: var(--red); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 12px; font-weight: 600; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+    .swipe-wrapper.swiping .swipe-delete { opacity: 1; pointer-events: auto; }
     .swipe-inner { position: relative; transition: transform 0.2s; background: var(--surface); z-index: 1; }
     .artist-card.inactive { opacity: 0.4; }
     .type-badge { font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; display: inline-block; }
@@ -1101,6 +1102,7 @@ document.getElementById('volgen-list').addEventListener('click', e => {
     const dx = e.touches[0].clientX - startX;
     if (dx < -10) {
       swiping = true;
+      currentInner.parentElement.classList.add('swiping');
       currentInner.style.transform = `translateX(${Math.max(dx, -80)}px)`;
     }
   }, { passive: true });
@@ -1113,6 +1115,7 @@ document.getElementById('volgen-list').addEventListener('click', e => {
       currentInner.style.transform = 'translateX(-80px)';
     } else {
       currentInner.style.transform = '';
+      currentInner.parentElement.classList.remove('swiping');
     }
     setTimeout(() => { swiping = false; }, 50);
     currentInner = null; startX = 0;
